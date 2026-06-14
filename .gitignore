@@ -1,0 +1,14 @@
+.env
+storage/
+__pycache__/
+*.pyc
+node_modules/
+.venv/
+venv/
+*.egg-info/
+.pytest_cache/
+# build output, editor/agent settings, and regenerated eval artifacts
+frontend/dist/
+.claude/
+batch_results.json
+*_results.json

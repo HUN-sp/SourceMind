@@ -1,0 +1,27 @@
+# --- PDF parsing ---
+pdfplumber==0.11.4          # layout-preserving text extraction (keeps table rows aligned)
+PyMuPDF==1.27.2.2           # fast page rasterization for the OCR fallback
+rapidocr-onnxruntime==1.4.4 # pure-pip OCR (no system Tesseract install) for scanned PDFs
+
+# --- embeddings + vector store (local, free, no API key) ---
+# Vector search is exact cosine over a NumPy matrix (see rag/store.py) — no
+# native-dependency vector DB, so it installs on any machine without a compiler.
+# Also provides the CrossEncoder used for re-ranking (cross-encoder/ms-marco-
+# MiniLM-L-6-v2, ~80MB, downloaded on first query) — no extra package needed.
+sentence-transformers==3.3.1
+
+# --- retrieval (hybrid is a Phase 5 stretch) ---
+rank-bm25==0.2.2
+
+# --- backend API ---
+fastapi==0.115.6
+uvicorn[standard]==0.34.0
+pydantic==2.10.4
+python-dotenv==1.0.1
+
+# --- LLM (Groq free tier, OpenAI-compatible) ---
+groq==0.13.1
+
+# --- tests ---
+pytest==8.3.4
+httpx==0.28.1
