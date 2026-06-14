@@ -1,4 +1,4 @@
-# Ask-the-Docs — a grounded RAG Q&A assistant
+# SourceMind — a grounded RAG Q&A assistant
 
 Ask natural-language questions about a set of PDF documents and get answers that
 are **grounded in the documents**, **cite the exact source (document + page)**,

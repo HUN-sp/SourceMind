@@ -43,7 +43,7 @@ export default function App() {
   return (
     <div className="app">
       <header className="app-header">
-        <h1>Ask the Docs</h1>
+        <h1>SourceMind</h1>
         <p className="tagline">
           Answers grounded in the provided documents — with the source for every
           answer. If it isn&apos;t in the documents, the system says so.

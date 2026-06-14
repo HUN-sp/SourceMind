@@ -18,7 +18,7 @@ from rag.generate import LLMError
 from rag.pipeline import AskResult, ask
 from rag.store import collection_size
 
-app = FastAPI(title="Ask-the-Docs", version="1.0")
+app = FastAPI(title="SourceMind", version="1.0")
 
 # The Vite dev server runs on 5173; allow it (and localhost) to call us.
 app.add_middleware(

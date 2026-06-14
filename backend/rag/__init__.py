@@ -1,1 +1,1 @@
-"""Ask-the-Docs RAG pipeline."""
+"""SourceMind RAG pipeline."""
