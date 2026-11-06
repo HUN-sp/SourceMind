@@ -35,7 +35,7 @@ export default function App() {
     submit();
   }
 
-  function useExample(ex) {
+  function runExample(ex) {
     setQuestion(ex);
     submit(ex);
   }
@@ -57,7 +57,8 @@ export default function App() {
           value={question}
           onChange={(e) => setQuestion(e.target.value)}
           onKeyDown={(e) => {
-            if (e.key === "Enter" && !e.shiftKey) {
+            // isComposing: Enter that confirms an IME candidate must not submit.
+            if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent?.isComposing && !e.isComposing) {
               e.preventDefault();
               submit();
             }
@@ -75,7 +76,7 @@ export default function App() {
           <button
             key={ex}
             className="example-chip"
-            onClick={() => useExample(ex)}
+            onClick={() => runExample(ex)}
             disabled={loading}
           >
             {ex}

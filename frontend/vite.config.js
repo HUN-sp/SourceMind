@@ -5,6 +5,10 @@ import react from "@vitejs/plugin-react";
 // frontend code stays environment-agnostic (it just calls "/api/ask").
 export default defineConfig({
   plugins: [react()],
+  test: {
+    environment: "jsdom",
+    setupFiles: "./src/test-setup.js",
+  },
   server: {
     port: 5173,
     proxy: {

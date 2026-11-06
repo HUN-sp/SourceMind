@@ -98,11 +98,11 @@ Legend: `[ ]` open, `[x]` fixed. Severity: **H**igh / **M**edium / **L**ow.
   `json_mode=False` (SDK expects it omitted) — latent bug, parameter currently unused.
 - [x] **L3** `backend/rag/config.py:30-62` — a malformed numeric env var (`TOP_K=abc`)
   crashes at import with an unhelpful `ValueError`.
-- [ ] **L4** `frontend/src/api.js:7` — no timeout/abort; a hung backend leaves the UI
+- [x] **L4** `frontend/src/api.js:7` — no timeout/abort; a hung backend leaves the UI
   spinning forever.
-- [ ] **L5** `frontend/src/App.jsx:38` — handler named `useExample` (looks like a hook);
+- [x] **L5** `frontend/src/App.jsx:38` — handler named `useExample` (looks like a hook);
   `Enter` submits during IME composition (`App.jsx:59-64`).
-- [ ] **L6** `frontend/package.json:2` — stale package name `ask-the-docs-frontend`.
+- [x] **L6** `frontend/package.json:2` — stale package name `ask-the-docs-frontend`.
 - [x] **L7** (fiscal_period exposed; per-query doc-filter list left — negligible at ~200 chunks) `backend/rag/store.py:296` — doc filter builds a Python list over all chunks
   on every query; `Source.fiscal_period` is computed but never exposed by the API.
 - [ ] **L8** `backend/rag/extract.py:50-57` — generic garbage-line filter may drop short
@@ -126,6 +126,7 @@ Legend: `[ ]` open, `[x]` fixed. Severity: **H**igh / **M**edium / **L**ow.
 - M6 partly fixed: split dev deps into `requirements-dev.txt`; documented Python 3.10–3.12; bumped fastapi 0.115.6→0.162.0, uvicorn 0.34→0.54, pydantic 2.10→2.14.3, python-dotenv 1.0→1.2.4, groq 0.13→1.7.0 (full test-suite green on these versions). NOT bumped (cannot be verified here, see "Needs real testing"): pdfplumber, PyMuPDF, rapidocr-onnxruntime, sentence-transformers, rank-bm25.
 - M7 fixed: hermetic suite now covers retrieval helpers, hybrid fusion, recency tiebreak, doc filter, gate #1, prompt ordering (`tests/test_retrieval_unit.py`) plus all the tests above; 122 pass offline, 7 real-index tests skip.
 - L1 + L3 fixed: no more `__import__`/in-handler import; malformed numeric env vars raise `ValueError: TOP_K must be a int, got 'abc'` (`tests/test_config_env.py`).
+- L4 + L5 + L6 fixed (+ extra bug found): `api.js` has a 60s timeout + caller cancel (`AbortSignal`), FastAPI list-style 422 `detail` no longer renders as `[object Object]`; Enter during IME composition no longer submits; `useExample` -> `runExample`; package renamed `sourcemind-frontend`. Added Vitest + Testing Library (`npm test`, 11 tests).
 
 
 ## 6. Enhancements — Phase 3
