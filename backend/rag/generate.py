@@ -49,11 +49,18 @@ class LLMUnavailableError(LLMError):
         super().__init__(message)
 
 
+def llm_configured() -> bool:
+    """True if a real-looking API key is set (not blank, not the .env.example
+    placeholder). Never exposes the key itself."""
+    key = CONFIG.groq_api_key
+    return bool(key) and not key.startswith("gsk_your_")
+
+
 @lru_cache(maxsize=1)
 def _client():
     from groq import Groq
 
-    if not CONFIG.groq_api_key or CONFIG.groq_api_key.startswith("gsk_your_"):
+    if not llm_configured():
         raise LLMConfigError(
             "GROQ_API_KEY is not set. Copy .env.example to .env and add a free "
             "key from https://console.groq.com/keys"

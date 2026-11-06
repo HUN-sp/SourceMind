@@ -181,3 +181,12 @@ body {
 }
 .doc-picker select:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .doc-picker select:disabled { opacity: 0.5; }
+
+/* --- setup banner --- */
+.setup-banner {
+  margin-bottom: 20px; padding: 14px 18px;
+  background: var(--amber-bg); border: 1px solid rgba(224, 169, 59, 0.35);
+  border-radius: 12px; color: var(--amber); font-size: 14px;
+}
+.setup-banner ul { margin: 6px 0 0; padding-left: 18px; }
+.setup-banner li { margin: 2px 0; }

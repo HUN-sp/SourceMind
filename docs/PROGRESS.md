@@ -139,7 +139,7 @@ Chosen for real users, in build order. `[x]` = built, tested and committed.
 - [x] **E2 Answer cache** — the Groq free tier caps ~100k tokens/day (README's #1 stated
   limitation); repeated/example questions needlessly burn it. In-memory LRU keyed on
   (question, doc), cleared on re-index, `cached` flag in the response. (`CACHE_SIZE`.)
-- [ ] **E3 Readiness banner** — first-run failures (backend down, index not built, no API
+- [x] **E3 Readiness banner** — first-run failures (backend down, index not built, no API
   key) currently surface as confusing errors after the first question. `/health` now says
   what's wrong and the UI shows a setup banner up front.
 - [ ] **E4 Cancel + copy + period tags** — LLM calls take seconds: add a Cancel button
@@ -150,6 +150,7 @@ Chosen for real users, in build order. `[x]` = built, tested and committed.
   and new config knobs.
 
 ### Enhancement log
+- E3 built: `/health` now returns `ready`, `problems[]`, `llm_configured` (never the key); UI shows a "Setup needed" banner (backend unreachable / index missing / no API key); bare 5xx from the dev proxy now says to check the backend. Tests in `test_api.py`, `App.test.jsx`, `api.test.js`.
 - E2 built: `rag/cache.py` LRU (`CACHE_SIZE`, default 128, 0 = off) in front of `/ask`; only answered results cached, keyed on normalised (question, doc) + index generation; `cached` flag in the response and cache stats in `/health`. `backend/tests/test_cache.py`.
 - E1 built: `GET /documents`, 404 for an unknown `doc` (before any LLM call), "Search in" picker in the UI. Tests: `backend/tests/test_documents.py`, `App.test.jsx`, `api.test.js`.
 

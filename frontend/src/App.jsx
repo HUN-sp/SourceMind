@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { askQuestion, listDocuments } from "./api.js";
+import { askQuestion, getHealth, listDocuments } from "./api.js";
 import AnswerPanel from "./components/AnswerPanel.jsx";
 
 const EXAMPLES = [
@@ -15,6 +15,26 @@ export default function App() {
   const [error, setError] = useState(null);
   const [documents, setDocuments] = useState([]);
   const [doc, setDoc] = useState(""); // "" = search all documents
+  const [setupProblems, setSetupProblems] = useState([]);
+
+  // On load, ask the backend whether it is actually ready to answer, so setup
+  // problems are explained up front instead of after the first failed question.
+  useEffect(() => {
+    let alive = true;
+    getHealth().then((h) => {
+      if (!alive) return;
+      if (h === null) {
+        setSetupProblems([
+          "Can't reach the SourceMind backend. Start it with `uvicorn app:app --port 8000` from the backend/ folder.",
+        ]);
+      } else if (!h.ready) {
+        setSetupProblems(h.problems ?? []);
+      }
+    });
+    return () => {
+      alive = false;
+    };
+  }, []);
 
   useEffect(() => {
     let alive = true;
@@ -59,6 +79,17 @@ export default function App() {
           answer. If it isn&apos;t in the documents, the system says so.
         </p>
       </header>
+
+      {setupProblems.length > 0 && (
+        <div className="setup-banner" role="status" data-testid="setup-banner">
+          <strong>Setup needed</strong>
+          <ul>
+            {setupProblems.map((p) => (
+              <li key={p}>{p}</li>
+            ))}
+          </ul>
+        </div>
+      )}
 
       <form className="ask-form" onSubmit={onSubmit}>
         <textarea

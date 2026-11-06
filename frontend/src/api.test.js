@@ -95,3 +95,27 @@ describe("listDocuments", () => {
     expect(await listDocuments()).toEqual([]);
   });
 });
+
+import { getHealth } from "./api.js";
+
+describe("getHealth", () => {
+  it("returns the health body", async () => {
+    const body = { ready: true, problems: [] };
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(jsonResponse(200, body)));
+    expect(await getHealth()).toEqual(body);
+  });
+
+  it("reports unreachable (null) on network failure or a proxy 5xx", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockRejectedValue(new TypeError("down")));
+    expect(await getHealth()).toBeNull();
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response("proxy error", { status: 500 })));
+    expect(await getHealth()).toBeNull();
+  });
+});
+
+describe("server errors without a detail", () => {
+  it("name the likely cause for 5xx responses (Vite's proxy returns a bare 500 when the backend is down)", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response("", { status: 500 })));
+    await expect(askQuestion("q")).rejects.toThrow(/backend running/i);
+  });
+});

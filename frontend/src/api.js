@@ -12,6 +12,10 @@ function describeDetail(detail, status) {
     if (msg) return `Please check your question: ${msg}.`;
   }
   if (status === 429) return "Too many requests. Please wait a moment and try again.";
+  if (status >= 500) {
+    // No JSON detail: usually the dev proxy answering for a backend that is down.
+    return `The server isn't responding properly (HTTP ${status}). Is the backend running on port 8000?`;
+  }
   return `Request failed (${status}).`;
 }
 
@@ -85,5 +89,19 @@ export async function listDocuments() {
     return Array.isArray(body?.documents) ? body.documents : [];
   } catch {
     return [];
+  }
+}
+
+/**
+ * Backend readiness from /health: `{ready, problems[], ...}`, or `null` if the
+ * backend can't be reached (network error, or the dev proxy's bare 5xx).
+ */
+export async function getHealth() {
+  try {
+    const res = await fetch("/api/health");
+    if (!res.ok) return null;
+    return await res.json();
+  } catch {
+    return null;
   }
 }

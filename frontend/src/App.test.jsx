@@ -3,7 +3,10 @@ import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import App from "./App.jsx";
 import * as api from "./api.js";
 
-beforeEach(() => vi.spyOn(api, "listDocuments").mockResolvedValue([]));
+beforeEach(() => {
+  vi.spyOn(api, "listDocuments").mockResolvedValue([]);
+  vi.spyOn(api, "getHealth").mockResolvedValue({ ready: true, problems: [] });
+});
 afterEach(() => vi.restoreAllMocks());
 
 const DOCS = [
@@ -59,5 +62,28 @@ describe("App", () => {
     render(<App />);
     await waitFor(() => expect(api.listDocuments).toHaveBeenCalled());
     expect(screen.queryByLabelText(/search in/i)).not.toBeInTheDocument();
+  });
+
+  it("shows no banner when the backend is ready", async () => {
+    render(<App />);
+    await waitFor(() => expect(api.getHealth).toHaveBeenCalled());
+    expect(screen.queryByTestId("setup-banner")).not.toBeInTheDocument();
+  });
+
+  it("explains setup problems reported by /health", async () => {
+    api.getHealth.mockResolvedValue({
+      ready: false,
+      problems: ["The search index isn't built. Run `python ingest.py` in backend/.", "No GROQ_API_KEY is configured."],
+    });
+    render(<App />);
+    const banner = await screen.findByTestId("setup-banner");
+    expect(banner).toHaveTextContent(/ingest\.py/);
+    expect(banner).toHaveTextContent(/GROQ_API_KEY/);
+  });
+
+  it("tells the user how to start the backend when it is unreachable", async () => {
+    api.getHealth.mockResolvedValue(null);
+    render(<App />);
+    expect(await screen.findByTestId("setup-banner")).toHaveTextContent(/uvicorn/);
   });
 });

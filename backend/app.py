@@ -16,7 +16,7 @@ from pydantic import BaseModel, Field
 from rag import store
 from rag.cache import AnswerCache
 from rag.config import CONFIG
-from rag.generate import LLMConfigError, LLMError, LLMRateLimitError
+from rag.generate import LLMConfigError, LLMError, LLMRateLimitError, llm_configured
 from rag.pipeline import AskResult, ask
 from rag.ratelimit import SlidingWindowLimiter
 from rag.store import IndexNotBuiltError, collection_size, list_documents
@@ -97,9 +97,21 @@ def _to_response(r: AskResult) -> AskResponse:
 @app.get("/health")
 def health() -> dict:
     chunks = collection_size()
+    has_key = llm_configured()
+    problems = []
+    if chunks == 0:
+        problems.append("The search index isn't built. Run `python ingest.py` in backend/.")
+    if not has_key:
+        problems.append(
+            "No GROQ_API_KEY is configured. Copy .env.example to .env, add a free key "
+            "from https://console.groq.com/keys, and restart the server."
+        )
     return {
         # "index_missing" tells operators/UI that /ask can't work yet.
         "status": "ok" if chunks > 0 else "index_missing",
+        "ready": not problems,
+        "problems": problems,
+        "llm_configured": has_key,
         "indexed_chunks": chunks,
         "model": CONFIG.llm_model,
         "embedding_model": CONFIG.embedding_model,
