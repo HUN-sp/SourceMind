@@ -48,7 +48,7 @@ cd backend && pytest
 Legend: `[ ]` open, `[x]` fixed. Severity: **H**igh / **M**edium / **L**ow.
 
 ### High
-- [ ] **H1** `backend/retrieval_harness.py:1-184` — a PowerShell terminal transcript was
+- [x] **H1** `backend/retrieval_harness.py:1-184` — a PowerShell terminal transcript was
   pasted over the top of the file; the script has a `SyntaxError` at line 1 and cannot run
   (README documents it as a main dev tool).
 - [ ] **H2** `backend/query.py:43` — `rerank=not args.no_rerank` forces the cross-encoder
@@ -111,6 +111,7 @@ Legend: `[ ]` open, `[x]` fixed. Severity: **H**igh / **M**edium / **L**ow.
 
 ## 5. Fix log — Phase 2
 (commits are listed here as items are completed)
+- H1 fixed: removed pasted PowerShell transcript from `retrieval_harness.py`; added `tests/test_scripts_compile.py` (compiles every backend `.py`). Harness itself not run (needs the real index).
 
 ## 6. Enhancements — Phase 3
 (chosen after Phase 2)
