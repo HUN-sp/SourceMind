@@ -23,7 +23,7 @@ except Exception:
     pass
 
 
-def main() -> None:
+def build_parser() -> argparse.ArgumentParser:
     ap = argparse.ArgumentParser()
     ap.add_argument("question", help="The question to retrieve for")
     ap.add_argument("--k", type=int, default=5, help="How many chunks to show")
@@ -32,16 +32,29 @@ def main() -> None:
         "--no-hybrid", action="store_true",
         help="Force pure vector search (skip BM25 fusion) — for before/after comparison",
     )
-    ap.add_argument(
+    rr = ap.add_mutually_exclusive_group()
+    rr.add_argument(
+        "--rerank", action="store_true",
+        help="Force the cross-encoder re-ranking stage ON (default: follow USE_RERANKER)",
+    )
+    rr.add_argument(
         "--no-rerank", action="store_true",
-        help="Skip the cross-encoder re-ranking stage — for before/after comparison",
+        help="Force the cross-encoder re-ranking stage OFF (default: follow USE_RERANKER)",
     )
-    args = ap.parse_args()
+    return ap
 
-    results = search(
-        args.question, top_k=args.k,
-        hybrid=not args.no_hybrid, rerank=not args.no_rerank,
-    )
+
+def search_options(args: argparse.Namespace) -> dict:
+    """Map CLI flags to search() kwargs. With no flag, `rerank=None` so search()
+    follows CONFIG.use_reranker — the same behaviour as the API."""
+    rerank = True if args.rerank else (False if args.no_rerank else None)
+    return {"top_k": args.k, "hybrid": False if args.no_hybrid else None, "rerank": rerank}
+
+
+def main() -> None:
+    args = build_parser().parse_args()
+
+    results = search(args.question, **search_options(args))
     if not results:
         print("No results (is the index built? run `python ingest.py`).")
         return

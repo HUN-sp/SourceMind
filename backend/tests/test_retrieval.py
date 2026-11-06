@@ -7,10 +7,10 @@ import pytest
 from rag.config import CONFIG
 from rag.store import search
 
-pytestmark = pytest.mark.skipif(
+pytestmark = [pytest.mark.real_index, pytest.mark.skipif(
     not (CONFIG.index_dir / "embeddings.npy").exists(),
     reason="index not built — run `python ingest.py` first",
-)
+)]
 
 
 def test_search_returns_at_most_top_k_with_valid_scores():
@@ -38,4 +38,4 @@ def test_metadata_is_populated_on_results():
     r = res[0]
     assert r.doc_label                      # human-readable citation label present
     assert r.statement_type in ("standalone", "consolidated", "")
-    assert r.chunk_type in ("table", "prose", "")
+    assert r.chunk_type in ("table", "row", "prose", "")

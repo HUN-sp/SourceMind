@@ -125,8 +125,10 @@ Other choices worth defending:
 - **Fail safe:** unparseable LLM output → refuse, never guess.
 - **Provider isolation:** swapping Groq → OpenAI → local Ollama is a one-function
   change in `generate.py`; nothing else knows who answers.
-- **Clean errors:** dead key / rate limit → `LLMError` → HTTP **502** with a
-  helpful message; empty question → 422 (Pydantic).
+- **Clean errors:** `generate.py` raises typed `LLMError` subclasses with safe, curated
+  messages (raw provider text is only logged): rate limit / quota → HTTP **429** (+
+  `Retry-After`), no key → **503**, provider down / bad key → **502**; index not built →
+  **503**; unknown `doc` → 404; empty or over-long question → 422 (Pydantic).
 - **`generate` is injectable** — `ask(..., generate=fake)` lets tests exercise the
   whole pipeline with no key and no network.
 

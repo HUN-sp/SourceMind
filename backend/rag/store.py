@@ -29,15 +29,25 @@ Persistence is just two files in INDEX_DIR:
 from __future__ import annotations
 
 import json
+import os
 import re
 from dataclasses import asdict, dataclass
 from functools import lru_cache
 
 import numpy as np
 
-from .chunk import Chunk
+from .chunk import Chunk, embedding_text
 from .config import CONFIG
 from .embed import embed_documents, embed_query
+
+class IndexNotBuiltError(FileNotFoundError):
+    """The search index doesn't exist yet (ingest hasn't been run)."""
+
+
+class IndexCorruptError(IndexNotBuiltError):
+    """The index files exist but don't agree with each other (e.g. an interrupted
+    ingest). Treated like 'not built': the fix is to re-run ingest."""
+
 
 _EMB_FILE = "embeddings.npy"
 _META_FILE = "chunks.json"
@@ -60,17 +70,31 @@ class Retrieved:
 
 def index_chunks(chunks: list[Chunk], batch_size: int = 128) -> int:
     """(Re)build the index from scratch and persist it to INDEX_DIR."""
+    if not chunks:
+        raise ValueError("no chunks to index (did extraction find any text?)")
     CONFIG.index_dir.mkdir(parents=True, exist_ok=True)
 
     vectors: list[list[float]] = []
     for i in range(0, len(chunks), batch_size):
         batch = chunks[i : i + batch_size]
-        vectors.extend(embed_documents([c.text for c in batch]))
+        vectors.extend(embed_documents([embedding_text(c) for c in batch]))
 
     emb = np.asarray(vectors, dtype=np.float32)
-    np.save(CONFIG.index_dir / _EMB_FILE, emb)
-    with open(CONFIG.index_dir / _META_FILE, "w", encoding="utf-8") as f:
-        json.dump([asdict(c) for c in chunks], f, ensure_ascii=False)
+    # Write to temp files, then rename into place, so a crash mid-write can never
+    # leave a half-written file where the live index was. (The two renames are not
+    # jointly atomic; _load() additionally verifies the pair agrees.)
+    emb_tmp = CONFIG.index_dir / (_EMB_FILE + ".tmp")
+    meta_tmp = CONFIG.index_dir / (_META_FILE + ".tmp")
+    try:
+        with open(emb_tmp, "wb") as f:
+            np.save(f, emb)
+        with open(meta_tmp, "w", encoding="utf-8") as f:
+            json.dump([asdict(c) for c in chunks], f, ensure_ascii=False)
+        os.replace(meta_tmp, CONFIG.index_dir / _META_FILE)
+        os.replace(emb_tmp, CONFIG.index_dir / _EMB_FILE)
+    finally:
+        for tmp in (emb_tmp, meta_tmp):
+            tmp.unlink(missing_ok=True)
     return len(chunks)
 
 
@@ -84,21 +108,39 @@ def _load() -> tuple[np.ndarray, list[dict]]:
         emb_path = CONFIG.index_dir / _EMB_FILE
         meta_path = CONFIG.index_dir / _META_FILE
         if not emb_path.exists():
-            raise FileNotFoundError(
+            raise IndexNotBuiltError(
                 f"No index at {CONFIG.index_dir}. Run `python ingest.py` first."
             )
-        emb = np.load(emb_path)
-        with open(meta_path, encoding="utf-8") as f:
-            meta = json.load(f)
+        try:
+            emb = np.load(emb_path)
+            with open(meta_path, encoding="utf-8") as f:
+                meta = json.load(f)
+        except (OSError, ValueError) as e:  # missing chunks.json, truncated/invalid files
+            raise IndexCorruptError(
+                f"Index at {CONFIG.index_dir} is unreadable ({e}). Re-run `python ingest.py`."
+            ) from e
+        if emb.ndim != 2 or emb.shape[0] != len(meta):
+            raise IndexCorruptError(
+                f"Index at {CONFIG.index_dir} is inconsistent ({emb.shape[0] if emb.ndim else 0} "
+                f"embeddings vs {len(meta)} chunks). Re-run `python ingest.py`."
+            )
         _cache = (emb, meta)
     return _cache
 
 
+_generation = 0  # bumped on every reload so answer caches can tell the index changed
+
+
+def generation() -> int:
+    return _generation
+
+
 def reload_index() -> None:
     """Drop the in-memory caches (used after re-ingesting)."""
-    global _cache, _bm25_cache
+    global _cache, _bm25_cache, _generation
     _cache = None
     _bm25_cache = None
+    _generation += 1
 
 
 # --- BM25 keyword index (hybrid retrieval) ---------------------------------
@@ -145,6 +187,81 @@ def _period_key(period: str) -> int:
     return int(m.group(3)) * 10000 + _MONTH_NUM[m.group(1).lower()] * 100 + int(m.group(2))
 
 
+# --- Explicit periods / statement type named in the question -------------------
+# "...as of March 31, 2026", "FY2026", "Q2 FY2026 (July-September 2025)". We resolve
+# these to the quarter-end dates filings are labelled with, and (a) give chunks of a
+# matching filing a small score bonus, (b) strip the expression from the text used for
+# semantic/keyword matching — there it only matches the doc-label prefix that every
+# chunk of a filing shares, drowning out the metric the user actually asked about.
+_MONTH_ALIASES = {
+    **{m: i + 1 for i, m in enumerate(_MONTHS)},
+    "jan": 1, "feb": 2, "mar": 3, "apr": 4, "jun": 6, "jul": 7, "aug": 8,
+    "sep": 9, "sept": 9, "oct": 10, "nov": 11, "dec": 12,
+}
+_MON = r"(" + "|".join(sorted(_MONTH_ALIASES, key=len, reverse=True)) + r")\.?"
+_YEAR = r"((?:19|20)\d{2})"
+_FYNUM = r"'?((?:19|20)\d{2}|\d{2})"
+_QUARTER_END = {1: (6, 30, 0), 2: (9, 30, 0), 3: (12, 31, 0), 4: (3, 31, 1)}  # Indian FY: Apr-Mar
+
+
+def _fy_year(g: str) -> int:
+    y = int(g)
+    return y if y >= 100 else 2000 + y
+
+
+def _month_end(year: int, month: int) -> int:
+    import calendar
+
+    return year * 10000 + month * 100 + calendar.monthrange(year, month)[1]
+
+
+# (regex, resolver(match) -> list[int]) — applied in order; matched text is removed.
+_PERIOD_PATTERNS = [
+    (re.compile(r"\b((?:q[1-4](?:\s*(?:,|&|/|\band\b|\bor\b))*\s*)+)(?:of\s*)?(?:fy|f\.y\.?)\s*" + _FYNUM + r"\b", re.I),  # Q2, Q3 and Q4 of FY2026
+     lambda m: [
+         (_fy_year(m.group(2)) - 1 + _QUARTER_END[int(q)][2]) * 10000 + _QUARTER_END[int(q)][0] * 100 + _QUARTER_END[int(q)][1]
+         for q in re.findall(r"q([1-4])", m.group(1), re.I)
+     ]),
+    (re.compile(r"\b(?:fy|f\.y\.?|fiscal\s+year|financial\s+year)\s*" + _FYNUM + r"\b", re.I),
+     lambda m: [_fy_year(m.group(1)) * 10000 + 331]),
+    (re.compile(r"\b" + _MON + r"\s*(?:-|–|to)\s*" + _MON + r",?\s*" + _YEAR + r"\b", re.I),   # July-September 2025
+     lambda m: [_month_end(int(m.group(3)), _MONTH_ALIASES[m.group(2).lower()])]),
+    (re.compile(r"\b" + _MON + r"\s+(\d{1,2})(?:st|nd|rd|th)?,?\s+" + _YEAR + r"\b", re.I),   # March 31, 2026
+     lambda m: [int(m.group(3)) * 10000 + _MONTH_ALIASES[m.group(1).lower()] * 100 + int(m.group(2))]),
+    (re.compile(r"\b(\d{1,2})(?:st|nd|rd|th)?\s+" + _MON + r",?\s+" + _YEAR + r"\b", re.I),   # 31 March 2026
+     lambda m: [int(m.group(3)) * 10000 + _MONTH_ALIASES[m.group(2).lower()] * 100 + int(m.group(1))]),
+    (re.compile(r"\b" + _MON + r",?\s+" + _YEAR + r"\b", re.I),                               # March 2026
+     lambda m: [_month_end(int(m.group(2)), _MONTH_ALIASES[m.group(1).lower()])]),
+    (re.compile(r"\b(\d{1,2})[./-](\d{1,2})[./-]" + _YEAR + r"\b"),                           # 31.03.2026
+     lambda m: [int(m.group(3)) * 10000 + int(m.group(2)) * 100 + int(m.group(1))]),
+]
+
+
+def parse_query_periods(question: str) -> tuple[set[int], str]:
+    """Resolve periods named in the question to sortable dates (YYYYMMDD, matching
+    `_period_key`) and return (dates, question-with-those-expressions-removed)."""
+    keys: set[int] = set()
+    text = question
+    for rx, resolve in _PERIOD_PATTERNS:
+        def _sub(m, resolve=resolve):
+            keys.update(resolve(m))
+            return " "
+        text = rx.sub(_sub, text)
+    text = re.sub(r"\(\s*\)", " ", text)           # parentheses emptied by the removal
+    text = " ".join(text.split())
+    return keys, (text if keys else question)
+
+
+def query_statement(question: str) -> str | None:
+    """'consolidated' / 'standalone' if the question names exactly one, else None."""
+    q = question.lower()
+    cons = bool(re.search(r"\b(consolidated|group)\b", q))
+    stand = bool(re.search(r"\bstandalone\b", q))
+    if cons == stand:
+        return None
+    return "consolidated" if cons else "standalone"
+
+
 def _query_names_period(question: str) -> bool:
     """True if the question pins a specific period (a year, or a month name). When
     it does, we must NOT bias toward recency — the explicit match should decide."""
@@ -164,6 +281,22 @@ def _recency_bonus(candidate_idx: np.ndarray, meta: list[dict], weight: float) -
     rank = {k: r for r, k in enumerate(distinct)}  # oldest=0 ... newest=len-1
     span = len(distinct) - 1
     return {i: weight * (rank[k] / span) for i, k in keys.items() if k}
+
+
+def _metadata_bonus(candidate_idx, meta, periods, statement, weight, base=None):
+    """+weight for a chunk whose filing period is one the question named, and +weight
+    for one whose statement type is the one it named. Added onto `base` bonuses."""
+    out = dict(base or {})
+    for i in candidate_idx:
+        m = meta[int(i)]
+        b = 0.0
+        if periods and _period_key(m.get("fiscal_period", "")) in periods:
+            b += weight
+        if statement and m.get("statement_type") == statement:
+            b += weight
+        if b:
+            out[int(i)] = out.get(int(i), 0.0) + b
+    return out
 
 
 # --- Cross-encoder re-ranking ----------------------------------------------
@@ -228,6 +361,44 @@ def _rerank(question: str, pool_idxs: list[int], meta: list[dict], top_k: int) -
     return sorted(fused, key=lambda i: fused[i], reverse=True)[:top_k]
 
 
+_MIN_CHUNKS_FOR_FOCUS = 50
+
+
+@lru_cache(maxsize=8)
+def _common_terms(generation_: int, ratio: float) -> frozenset[str]:
+    """Terms present in more than `ratio` of the PAGE-LEVEL chunks (e.g. 'bank', 'year',
+    'ended'). Corpus-derived, so it adapts to whatever documents are indexed — no
+    hand-written list. Row chunks are excluded: they're short and numerous, so counting
+    them would dilute the ratio of terms that only appear in page text. Keyed on the
+    index generation."""
+    _, meta = _load()
+    pages = [m for m in meta if m.get("chunk_type") != "row"]
+    n = len(pages)
+    if n < _MIN_CHUNKS_FOR_FOCUS:  # document frequency is meaningless on a tiny corpus
+        return frozenset()
+    df: dict[str, int] = {}
+    for m in pages:
+        for t in set(_tokenize(m["text"])):
+            df[t] = df.get(t, 0) + 1
+    return frozenset(t for t, c in df.items() if c / n > ratio)
+
+
+def focus_query(question: str) -> str:
+    """The question reduced to terms that discriminate between chunks: no stopwords,
+    bare numbers, single characters or corpus-ubiquitous terms. Used for BOTH the
+    semantic and keyword rankings — words every chunk shares ("HDFC Bank", "year
+    ended") otherwise outweigh the metric ("net profit") and pull in letterhead and
+    boilerplate chunks. Falls back to the original text if nothing would be left."""
+    if not CONFIG.focus_query:
+        return question
+    common = _common_terms(_generation, CONFIG.common_term_ratio)
+    kept = [
+        t for t in _tokenize(question)
+        if t not in _STOPWORDS and not t.isdigit() and len(t) > 1 and t not in common
+    ]
+    return " ".join(kept) if kept else question
+
+
 def _get_bm25():
     """Build (once) a BM25 index over the chunk texts, aligned with meta order."""
     global _bm25_cache
@@ -244,6 +415,7 @@ def _rrf_fuse(
     candidate_idx: np.ndarray,
     top_k: int,
     bonus: dict[int, float] | None = None,
+    weights: list[float] | None = None,
 ) -> list[int]:
     """Reciprocal Rank Fusion: score each candidate by sum(1/(rrf_k + rank)) over
     every ranking it appears in, then take the best top_k. A chunk that ranks
@@ -251,9 +423,10 @@ def _rrf_fuse(
     small per-chunk score (e.g. a recency tiebreak)."""
     k = CONFIG.rrf_k
     scores: dict[int, float] = {int(i): 0.0 for i in candidate_idx}
-    for ranking in ranked_lists:
+    for n, ranking in enumerate(ranked_lists):
+        w = weights[n] if weights else 1.0
         for rank, idx in enumerate(ranking):
-            scores[int(idx)] += 1.0 / (k + rank)
+            scores[int(idx)] += w / (k + rank)
     if bonus:
         for idx, b in bonus.items():
             if idx in scores:
@@ -288,7 +461,12 @@ def search(
     pool_k = max(CONFIG.rerank_candidates, top_k) if rerank else top_k
     emb, meta = _load()
 
-    q = np.asarray(embed_query(question), dtype=np.float32)
+    # Separate WHAT was asked from WHEN: search on the metric words only, and use the
+    # named period / statement type as a soft bonus on chunk metadata (see above).
+    periods, search_text = parse_query_periods(question)
+    statement = query_statement(question)
+    search_text = focus_query(search_text)
+    q = np.asarray(embed_query(search_text), dtype=np.float32)
     sims = emb @ q  # both sides are L2-normalized -> dot product == cosine
 
     # Optional document filter -> the candidate set we rank within.
@@ -305,13 +483,27 @@ def search(
 
     if hybrid:
         # Keyword ranking over the same candidates, then fuse the two by RRF.
-        bm25_scores = _get_bm25().get_scores(_query_tokens(question))
+        bm25_scores = _get_bm25().get_scores(_query_tokens(search_text))
         bm25_order = candidate_idx[np.argsort(-bm25_scores[candidate_idx])]
         # Recency tiebreak: only when the question names no specific period.
         bonus = None
         if CONFIG.recency_boost > 0 and not _query_names_period(question):
             bonus = _recency_bonus(candidate_idx, meta, CONFIG.recency_boost)
-        chosen = _rrf_fuse([vec_order, bm25_order], candidate_idx, pool_k, bonus)
+        if CONFIG.period_boost > 0 and (periods or statement):
+            bonus = _metadata_bonus(candidate_idx, meta, periods, statement, CONFIG.period_boost, bonus)
+        # Rank row chunks and page-level chunks in SEPARATE lists. Their cosines live on
+        # different scales (a short label-only row vs a long page chunk), so in one mixed
+        # list the page chunks crowd the rows out regardless of relevance.
+        is_row = np.array([m.get("chunk_type") == "row" for m in meta])
+        # Row lists carry CONFIG.row_weight (default 1.0 = equal footing with page lists).
+        lists, weights = [], []
+        for ranked in (vec_order, bm25_order):
+            for want_rows in (True, False):
+                part = ranked[is_row[ranked] == want_rows]
+                if part.size:
+                    lists.append(part)
+                    weights.append(CONFIG.row_weight if want_rows else 1.0)
+        chosen = _rrf_fuse(lists, candidate_idx, pool_k, bonus, weights)
     else:
         chosen = vec_order[:pool_k].tolist()
 
@@ -341,8 +533,29 @@ def search(
     return out
 
 
+def list_documents() -> list[dict]:
+    """One summary row per indexed document (sorted by name): label, period, size.
+    Empty list if the index isn't built."""
+    try:
+        _, meta = _load()
+    except IndexNotBuiltError:
+        return []
+    docs: dict[str, dict] = {}
+    pages: dict[str, set[int]] = {}
+    for m in meta:
+        d = docs.setdefault(m["doc"], {
+            "doc": m["doc"], "doc_label": m.get("doc_label", ""),
+            "fiscal_period": m.get("fiscal_period", ""), "chunks": 0,
+        })
+        d["chunks"] += 1
+        pages.setdefault(m["doc"], set()).add(int(m["page"]))
+    for name, d in docs.items():
+        d["pages"] = len(pages[name])
+    return [docs[k] for k in sorted(docs)]
+
+
 def collection_size() -> int:
     try:
         return len(_load()[1])
-    except FileNotFoundError:
+    except IndexNotBuiltError:  # not built, or corrupt
         return 0

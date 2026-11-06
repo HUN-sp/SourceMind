@@ -21,6 +21,8 @@ data/*.pdf                                   POST /ask {question}
   │ derive metadata (statement type,           │   vector (cosine) + BM25 keyword
   │   period, doc label) from headers          │   fused by Reciprocal Rank Fusion
   │ chunk per page (≤350 tok, header-attached) │   + recency tiebreak
+  │ + one chunk per TABLE ROW (values labelled │   + period/statement-aware bonus
+  │   by column, embedded from the label)      │   (rows & pages ranked separately)
   │ embed (local bge-small) + store            │
   ▼                                            │ GATE 1: best similarity < floor → refuse
 storage/index/                                 │ build numbered, labelled context
@@ -39,9 +41,9 @@ reason similarity search is meaningful. Full rationale for every choice is in
 | PDF parsing | `pdfplumber` (layout-preserving) + RapidOCR fallback for scans |
 | Embeddings | `BAAI/bge-small-en-v1.5` (local, free, no key) |
 | Vector store | exact cosine over a NumPy matrix (no native deps) |
-| Keyword search | `rank-bm25`, fused with vectors via Reciprocal Rank Fusion |
-| LLM | Groq free tier (`llama-3.3-70b-versatile`), temperature 0, JSON mode |
-| Backend | FastAPI (`/health`, `/ask`) |
+| Keyword search | `rank-bm25`, fused with vectors via Reciprocal Rank Fusion (row and page chunks ranked separately; period/statement-aware) |
+| LLM | Groq free tier (`openai/gpt-oss-120b`; override with `LLM_MODEL`), temperature 0, JSON mode |
+| Backend | FastAPI (`/health`, `/documents`, `/ask`) |
 | Frontend | React + Vite |
 
 ---
@@ -49,14 +51,14 @@ reason similarity search is meaningful. Full rationale for every choice is in
 ## Setup from zero
 
 ### 0. Prerequisites
-- Python 3.10+ and Node 18+
+- Python **3.10–3.12** (RapidOCR has no wheels for 3.13+) and Node 18+
 - A free Groq API key — sign up at <https://console.groq.com/keys> (no card needed)
 
 ### 1. Backend
 ```bash
 cd backend
 python -m venv .venv && . .venv/Scripts/activate    # Windows; use .venv/bin/activate on macOS/Linux
-pip install -r requirements.txt
+pip install -r requirements.txt          # tests too: pip install -r requirements-dev.txt
 
 # configure secrets
 cp ../.env.example ../.env          # then edit ../.env and paste your GROQ_API_KEY
@@ -68,7 +70,7 @@ cp ../.env.example ../.env          # then edit ../.env and paste your GROQ_API_
 python ingest.py
 ```
 This parses every PDF in `../data`, OCRs scanned pages, chunks, embeds, and writes
-the index to `../storage/index`. The first run downloads the embedding model
+the index to `../storage/index` (949 chunks: page-level chunks plus one chunk per table row). The first run downloads the embedding model
 (~130 MB) and OCRs the scanned PDF, so it takes a few minutes. Re-run it whenever
 the documents or chunking change.
 
@@ -81,8 +83,7 @@ python ingest.py --stats     # print page/chunk stats without indexing
 # from backend/
 uvicorn app:app --reload --port 8000
 ```
-- `GET  http://localhost:8000/health` → index + model status
-- `POST http://localhost:8000/ask` with `{"question": "..."}` → `{answer, sources[], refused}`
+See [API reference](#api-reference) below. Quick check: `curl http://localhost:8000/health`.
 
 ### 4. Run the frontend
 ```bash
@@ -102,23 +103,32 @@ cd backend
 # See exactly what retrieval returns for a question (no LLM call):
 python query.py "What is the gross NPA ratio?" --k 8
 
-# Token-free retrieval harness: does the answer chunk land in the top-8 for the
-# 20-question evaluation bank? Great fast feedback loop while tuning.
+# Token-free retrieval harness (15/17 on the real index since the table-aware retrieval
+# work): does the answer chunk land in the top-8 for the 20-question evaluation bank? Great fast feedback loop while tuning.
 python retrieval_harness.py
 python retrieval_harness.py --rerank     # A/B with the cross-encoder reranker on
 
-# Automated tests (chunking/provenance, retrieval, API/grounding):
-pytest
+# Automated backend tests — fully OFFLINE (fake embedder/tokenizer/LLM, synthetic
+# index; no model download, no API key, no built index needed):
+pytest                      # from backend/   (pip install -r requirements-dev.txt)
+# Tests tagged `real_index` (tests/test_retrieval.py, tests/test_pipeline.py) use the
+# real model + your built index and are skipped until you run `python ingest.py`.
+
+# Frontend tests (Vitest + Testing Library) and a production build check:
+cd ../frontend && npm test && npm run build
 ```
+
+CI (`.github/workflows/ci.yml`) runs the offline backend suite (a light install from
+`backend/requirements-ci.txt`) and the frontend tests/build on every push and PR.
 
 End-to-end question runs that DO call the LLM:
 ```bash
-python run_batch.py      # runs the evaluation question bank against the live API
+python run_batch.py      # runs the evaluation bank against the live API; PASS requires the correct value
 ```
 > Note: the Groq free tier has a ~100k-tokens/day cap. Each answer sends several
 > document chunks as context, so a long testing session can exhaust the daily
-> budget — at which point the API returns a clean "model unavailable" 502 (not a
-> crash). Use a fresh key or wait for the daily reset to continue.
+> budget — at which point the API returns a clean 429 "quota used up" (not a
+> crash); repeated questions are served from the answer cache and cost no tokens. Use a fresh key or wait for the daily reset to continue.
 
 ---
 
@@ -126,7 +136,27 @@ python run_batch.py      # runs the evaluation question bank against the live AP
 
 All tunables live in `backend/rag/config.py`, overridable via `.env` (see
 [`.env.example`](.env.example)). Key knobs: `TOP_K`, `MIN_SIMILARITY` (grounding
-floor), `USE_HYBRID`, `RRF_K`, `RECENCY_BOOST`, `USE_RERANKER`.
+floor), `USE_HYBRID`, `RRF_K`, `RECENCY_BOOST`, `USE_RERANKER` (off by default),
+plus the API guards `MAX_QUESTION_CHARS`, `RATE_LIMIT_PER_MINUTE` and the answer cache
+size `CACHE_SIZE`. Table-aware retrieval knobs: `ROW_CHUNKS` (needs a re-ingest), `ROW_WEIGHT`,
+`PERIOD_BOOST`, `FOCUS_QUERY`, `COMMON_TERM_RATIO` — see [DECISIONS.md §3b](DECISIONS.md). A malformed
+numeric value fails at startup naming the variable.
+
+## API reference
+
+| Endpoint | Purpose |
+|---|---|
+| `GET /health` | `{status, ready, problems[], llm_configured, indexed_chunks, model, embedding_model, cache}`. `ready:false` lists what to fix (index not built, no API key). Never returns the key. |
+| `GET /documents` | `{documents: [{doc, doc_label, fiscal_period, pages, chunks}]}` — what's indexed; used by the UI's "Search in" picker. |
+| `POST /ask` | Body `{question, doc?}` → `{answer, sources[{doc, page, snippet, similarity, doc_label, statement_type, fiscal_period}], refused, cached}`. |
+
+`/ask` status codes: `200` answered **or** honestly refused (`refused: true`); `404` unknown `doc`;
+`422` empty / over-long question; `429` too many requests or the LLM's quota is used up
+(with `Retry-After`); `502` model unreachable or erroring; `503` index not built / no API key.
+Error `detail` text is safe to show to users (raw provider errors are only logged).
+
+Repeating a question is answered from an in-memory cache (`cached: true`, no LLM tokens
+spent); refusals are never cached.
 
 ## Repo layout
 ```
@@ -137,9 +167,12 @@ backend/
   ingest.py           PDF -> index CLI
   query.py            retrieval inspector
   retrieval_harness.py token-free top-k evaluation
-  rag/                config, extract, chunk, embed, store, generate, pipeline
-  tests/              pytest suite
-frontend/             React + Vite UI
+  rag/                config, extract, chunk, embed, store, generate, pipeline,
+                      cache (answer LRU), ratelimit (per-IP throttle)
+  tests/              offline pytest suite (see conftest.py for the fake models)
+  requirements*.txt   runtime / dev / light CI dependency sets
+frontend/             React + Vite UI (npm test = Vitest)
+.github/workflows/    CI
 docs/                 ARCHITECTURE.md, JOURNEY.md, STUDY_GUIDE.md
 DECISIONS.md          why each choice was made (read this)
 EVALUATION.md         8+ questions with answers, sources, honest verdicts

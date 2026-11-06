@@ -9,14 +9,17 @@ Run (from backend/):
 """
 from __future__ import annotations
 
-from fastapi import FastAPI
+from fastapi import Depends, FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 
+from rag import store
+from rag.cache import AnswerCache
 from rag.config import CONFIG
-from rag.generate import LLMError
+from rag.generate import LLMConfigError, LLMError, LLMModelError, LLMRateLimitError, llm_configured
 from rag.pipeline import AskResult, ask
-from rag.store import collection_size
+from rag.ratelimit import SlidingWindowLimiter
+from rag.store import IndexNotBuiltError, collection_size, list_documents
 
 app = FastAPI(title="SourceMind", version="1.0")
 
@@ -29,9 +32,33 @@ app.add_middleware(
 )
 
 
+# Per-client throttle for /ask (see rag/ratelimit.py). Module-level so tests can swap it.
+limiter = SlidingWindowLimiter(limit=CONFIG.rate_limit_per_minute, window_seconds=60)
+
+
+def _rate_limit(request: Request) -> None:
+    client_ip = request.client.host if request.client else "unknown"
+    allowed, retry_after = limiter.check(client_ip)
+    if not allowed:
+        raise HTTPException(
+            status_code=429,
+            detail=f"Too many requests. Please wait {retry_after}s and try again.",
+            headers={"Retry-After": str(retry_after)},
+        )
+
+
+# Remembers answered questions (see rag/cache.py). Module-level so tests can swap it.
+answer_cache = AnswerCache(CONFIG.cache_size)
+
+
 class AskRequest(BaseModel):
-    question: str = Field(..., min_length=1, description="The user's question")
-    doc: str | None = Field(None, description="Optional: restrict to one document")
+    question: str = Field(
+        ..., min_length=1, max_length=CONFIG.max_question_chars,
+        description="The user's question",
+    )
+    doc: str | None = Field(
+        None, max_length=255, description="Optional: restrict to one document"
+    )
 
 
 class SourceOut(BaseModel):
@@ -41,12 +68,14 @@ class SourceOut(BaseModel):
     similarity: float
     doc_label: str = ""
     statement_type: str = ""
+    fiscal_period: str = ""
 
 
 class AskResponse(BaseModel):
     answer: str
     sources: list[SourceOut]
     refused: bool
+    cached: bool = False  # True when served from the answer cache (no LLM tokens spent)
 
 
 def _to_response(r: AskResult) -> AskResponse:
@@ -58,6 +87,7 @@ def _to_response(r: AskResult) -> AskResponse:
                 doc=s.doc, page=s.page, snippet=s.snippet,
                 similarity=round(s.similarity, 3),
                 doc_label=s.doc_label, statement_type=s.statement_type,
+                fiscal_period=s.fiscal_period,
             )
             for s in r.sources
         ],
@@ -66,21 +96,74 @@ def _to_response(r: AskResult) -> AskResponse:
 
 @app.get("/health")
 def health() -> dict:
+    chunks = collection_size()
+    has_key = llm_configured()
+    problems = []
+    if chunks == 0:
+        problems.append("The search index isn't built. Run `python ingest.py` in backend/.")
+    if not has_key:
+        problems.append(
+            "No GROQ_API_KEY is configured. Copy .env.example to .env, add a free key "
+            "from https://console.groq.com/keys, and restart the server."
+        )
     return {
-        "status": "ok",
-        "indexed_chunks": collection_size(),
+        # "index_missing" tells operators/UI that /ask can't work yet.
+        "status": "ok" if chunks > 0 else "index_missing",
+        "ready": not problems,
+        "problems": problems,
+        "llm_configured": has_key,
+        "indexed_chunks": chunks,
         "model": CONFIG.llm_model,
         "embedding_model": CONFIG.embedding_model,
+        "cache": answer_cache.stats(),
     }
 
 
-@app.post("/ask", response_model=AskResponse)
-def ask_endpoint(req: AskRequest):
-    from fastapi import HTTPException
+class DocumentOut(BaseModel):
+    doc: str
+    doc_label: str = ""
+    fiscal_period: str = ""
+    pages: int
+    chunks: int
 
+
+class DocumentsResponse(BaseModel):
+    documents: list[DocumentOut]
+
+
+@app.get("/documents", response_model=DocumentsResponse)
+def documents() -> DocumentsResponse:
+    """The indexed documents, so a client can offer a 'search only in…' picker."""
+    return DocumentsResponse(documents=[DocumentOut(**d) for d in list_documents()])
+
+
+@app.post("/ask", response_model=AskResponse, dependencies=[Depends(_rate_limit)])
+def ask_endpoint(req: AskRequest):
+    if req.doc is not None:
+        known = {d["doc"] for d in list_documents()}
+        if known and req.doc not in known:  # (an unbuilt index is reported below)
+            raise HTTPException(status_code=404, detail=f"Unknown document: {req.doc}")
+    key = AnswerCache.key(req.question, req.doc, store.generation())
+    hit = answer_cache.get(key)
+    if hit is not None:
+        return hit.model_copy(update={"cached": True})
     try:
         result = ask(req.question, doc=req.doc)
-    except LLMError as e:
-        # The model is unreachable (bad key / rate limit). Tell the client clearly.
+    except IndexNotBuiltError:
+        # Fixed text on purpose: the exception message contains a server path.
+        raise HTTPException(
+            status_code=503,
+            detail="The search index is missing or unreadable. Run `python ingest.py` "
+                   "on the server, then try again.",
+        )
+    except LLMRateLimitError as e:
+        headers = {"Retry-After": str(e.retry_after)} if e.retry_after else None
+        raise HTTPException(status_code=429, detail=str(e), headers=headers)
+    except (LLMConfigError, LLMModelError) as e:  # server not set up for LLM calls (no key / bad model)
+        raise HTTPException(status_code=503, detail=str(e))
+    except LLMError as e:  # message is curated + safe; raw provider text is only logged
         raise HTTPException(status_code=502, detail=str(e))
-    return _to_response(result)
+    response = _to_response(result)
+    if not response.refused:  # never cache refusals: they may be a transient LLM hiccup
+        answer_cache.put(key, response)
+    return response
