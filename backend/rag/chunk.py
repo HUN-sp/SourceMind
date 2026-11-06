@@ -126,6 +126,26 @@ def _overlap_tail(text: str, max_tokens: int) -> str:
     return " ".join(tail)
 
 
+def _split_by_tokens(words: list[str], max_tok: int) -> list[str]:
+    """Greedily pack words into pieces of <= max_tok tokens. Binary-searches the
+    largest fitting prefix, so tokenizer calls are O(pieces * log n), not one per
+    word. A single word bigger than the window still becomes its own piece (never
+    an empty one)."""
+    pieces: list[str] = []
+    i = 0
+    while i < len(words):
+        lo, hi = 1, len(words) - i  # a piece always takes at least one word
+        while lo < hi:
+            mid = (lo + hi + 1) // 2
+            if count_tokens(" ".join(words[i : i + mid])) <= max_tok:
+                lo = mid
+            else:
+                hi = mid - 1
+        pieces.append(" ".join(words[i : i + lo]))
+        i += lo
+    return pieces
+
+
 def chunk_page(page: Page) -> list[Chunk]:
     max_tok = CONFIG.chunk_max_tokens
     overlap_tok = CONFIG.chunk_overlap_tokens
@@ -143,15 +163,9 @@ def chunk_page(page: Page) -> list[Chunk]:
         # A single block bigger than the window is split by tokens directly.
         if count_tokens(block) > max_tok:
             flush()
-            words, piece = block.split(), ""
-            for w in words:
-                trial = (piece + " " + w).strip()
-                if count_tokens(trial) > max_tok:
-                    chunks.append(piece.strip())
-                    piece = w
-                else:
-                    piece = trial
-            cur = piece
+            pieces = _split_by_tokens(block.split(), max_tok)
+            chunks.extend(pieces[:-1])
+            cur = pieces[-1]  # keep filling the last piece with following blocks
             continue
 
         trial = (cur + "\n\n" + block).strip() if cur else block

@@ -75,7 +75,7 @@ Legend: `[ ]` open, `[x]` fixed. Severity: **H**igh / **M**edium / **L**ow.
 - [x] **M2** `backend/ingest.py:46` — `min(tok_counts)` raises `ValueError` when there are
   zero chunks (all pages empty); `backend/rag/extract.py:210-211` — one unreadable PDF
   aborts the whole ingest with a raw traceback.
-- [ ] **M3** `backend/rag/chunk.py:150` — oversized-block splitter can append an empty
+- [x] **M3** `backend/rag/chunk.py:150` — oversized-block splitter can append an empty
   chunk; `chunk.py:146-154,121-125` re-tokenize the growing string on every word (O(n²)).
 - [ ] **M4** `backend/rag/extract.py:102-109` — the PDF is re-opened for every OCR page and
   not closed if rasterisation/OCR raises (leaks handles; slow for big scans).
@@ -120,6 +120,7 @@ Legend: `[ ]` open, `[x]` fixed. Severity: **H**igh / **M**edium / **L**ow.
 - H6 fixed: `MAX_QUESTION_CHARS` (default 1000, 422 above) and per-IP `RATE_LIMIT_PER_MINUTE` (default 30, 429 + Retry-After) on `/ask` via new `rag/ratelimit.py`; `tests/test_limits.py`. Limiter is in-memory, per process, keyed on the socket IP (behind a reverse proxy, rate-limit at the proxy).
 - M1 fixed: index written via temp files + `os.replace`; `_load()` validates embeddings/chunks agree (`IndexCorruptError` -> 503 with re-ingest hint); empty chunk list rejected. `tests/test_store_index.py`.
 - M2 fixed: `extract_corpus` skips (and logs) unreadable PDFs and raises a clear `RuntimeError` if nothing is usable; `ingest.py` refactored into `run()` returning an exit code (no more `min([])` crash, no `__import__` hack -> also closes L1 ingest half). Tests: `test_extract_robustness.py`, `test_ingest_cli.py`.
+- M3 fixed: oversized-block splitting uses `_split_by_tokens` (binary search; never emits an empty chunk; tokenizer calls drop from ~1 per word to O(pieces·log n)). `tests/test_chunk_edge_cases.py`.
 
 ## 6. Enhancements — Phase 3
 (chosen after Phase 2)
