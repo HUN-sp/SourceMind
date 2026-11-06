@@ -51,11 +51,11 @@ Legend: `[ ]` open, `[x]` fixed. Severity: **H**igh / **M**edium / **L**ow.
 - [x] **H1** `backend/retrieval_harness.py:1-184` — a PowerShell terminal transcript was
   pasted over the top of the file; the script has a `SyntaxError` at line 1 and cannot run
   (README documents it as a main dev tool).
-- [ ] **H2** `backend/query.py:43` — `rerank=not args.no_rerank` forces the cross-encoder
+- [x] **H2** `backend/query.py:43` — `rerank=not args.no_rerank` forces the cross-encoder
   **on** by default (and downloads an 80 MB model), contradicting `config.py:60`
   (default off) and DECISIONS §6. The inspector therefore shows different results from
   the API.
-- [ ] **H3** `.env.example:38` — ships `USE_RERANKER=true`, whereas the code default and
+- [x] **H3** `.env.example:38` — ships `USE_RERANKER=true`, whereas the code default and
   DECISIONS §6 say it must be off (it measurably hurts numeric value rows). Anyone who
   follows the README setup gets the worse behaviour.
 - [ ] **H4** `backend/rag/store.py:87` + `backend/app.py:81-86` — if the index isn't
@@ -112,6 +112,8 @@ Legend: `[ ]` open, `[x]` fixed. Severity: **H**igh / **M**edium / **L**ow.
 ## 5. Fix log — Phase 2
 (commits are listed here as items are completed)
 - H1 fixed: removed pasted PowerShell transcript from `retrieval_harness.py`; added `tests/test_scripts_compile.py` (compiles every backend `.py`). Harness itself not run (needs the real index).
+- H2 fixed: `query.py` follows `CONFIG.use_reranker` unless `--rerank`/`--no-rerank` is given (`tests/test_query_cli.py`).
+- H3 fixed: `.env.example` now ships `USE_RERANKER=false`; `tests/test_env_example.py` keeps `.env.example` and code defaults in sync.
 
 ## 6. Enhancements — Phase 3
 (chosen after Phase 2)
