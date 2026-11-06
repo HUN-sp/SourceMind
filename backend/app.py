@@ -62,6 +62,7 @@ class SourceOut(BaseModel):
     similarity: float
     doc_label: str = ""
     statement_type: str = ""
+    fiscal_period: str = ""
 
 
 class AskResponse(BaseModel):
@@ -79,6 +80,7 @@ def _to_response(r: AskResult) -> AskResponse:
                 doc=s.doc, page=s.page, snippet=s.snippet,
                 similarity=round(s.similarity, 3),
                 doc_label=s.doc_label, statement_type=s.statement_type,
+                fiscal_period=s.fiscal_period,
             )
             for s in r.sources
         ],

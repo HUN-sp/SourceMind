@@ -52,3 +52,4 @@ def test_ask_happy_path_returns_answer_and_sources(tiny_index, monkeypatch):
     assert body["refused"] is False
     assert "1.15%" in body["answer"]
     assert body["sources"] and body["sources"][0]["page"] >= 1
+    assert body["sources"][0]["fiscal_period"]  # exposed so the UI can show the period

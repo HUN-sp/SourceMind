@@ -103,7 +103,7 @@ Legend: `[ ]` open, `[x]` fixed. Severity: **H**igh / **M**edium / **L**ow.
 - [ ] **L5** `frontend/src/App.jsx:38` — handler named `useExample` (looks like a hook);
   `Enter` submits during IME composition (`App.jsx:59-64`).
 - [ ] **L6** `frontend/package.json:2` — stale package name `ask-the-docs-frontend`.
-- [ ] **L7** `backend/rag/store.py:296` — doc filter builds a Python list over all chunks
+- [x] **L7** (fiscal_period exposed; per-query doc-filter list left — negligible at ~200 chunks) `backend/rag/store.py:296` — doc filter builds a Python list over all chunks
   on every query; `Source.fiscal_period` is computed but never exposed by the API.
 - [ ] **L8** `backend/rag/extract.py:50-57` — generic garbage-line filter may drop short
   genuine rows that are mostly punctuation (e.g. `( - )`); documented trade-off, left as is.
