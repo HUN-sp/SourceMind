@@ -63,6 +63,13 @@ like an analyst, using the labels and headers we give you:
   pick the value for the period the question asks about: for a FULL-YEAR question
   use the "Year ended" column whose date matches; for a quarter use the matching
   "Quarter ended" column.
+- Some passages are single table ROWS already rendered with every value labelled by its
+  column, e.g. "Net Profit ... | Quarter ended March 31, 2026: 19221.05 | ... |
+  Year ended March 31, 2026: 74671.29". Use the labelled value whose column matches the
+  question — a FULL-YEAR question wants the "Year ended" value, a quarter question the
+  "Quarter ended" value. Never answer with a different column's number.
+- These filings use an April-March fiscal year: FY2026 = the year ended March 31, 2026, and
+  Q1 = quarter ended June 30, Q2 = September 30, Q3 = December 31, Q4 = March 31.
 - Prefer the passage whose statement type and period MATCH the question. If the
   question doesn't specify standalone vs consolidated, prefer standalone and say so.
 - If the question does NOT specify a period, answer for the MOST RECENT period
@@ -110,7 +117,9 @@ def build_context(chunks: list[Retrieved]) -> str:
     blocks = []
     for i, c in enumerate(chunks, 1):
         label = f" — {c.doc_label}" if c.doc_label else ""
-        if c.chunk_type in ("table", "row"):
+        if c.chunk_type == "row":
+            kind = " [table row: each value is labelled with its column]"
+        elif c.chunk_type == "table":
             kind = " [table: each row's numbers line up with the period columns shown at the top]"
         else:
             kind = ""

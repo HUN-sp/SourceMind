@@ -83,15 +83,81 @@ filing covers), `doc_label`, `chunk_type` (table/prose), `chunk_index` (position
 within the document, used to present context in reading order). All derived from
 the documents' own header text — never from filenames.
 
-**Weak spot — the main one:** the dense "Analytical Ratios" block (CAR, EPS, NPA,
-RoA, net worth) is so number-heavy that the discriminating phrase (e.g. "Capital
-Adequacy Ratio") gets diluted, and adjacent ratios sometimes land in different
-chunks. So value-row lookups like CAR or net profit rank lower than prose, and
-occasionally fall outside the top-k. Measured with the token-free harness:
-~10/17 value-row questions land the answer chunk in the top-8. This affects **all**
-documents (it's a dense-table problem, not a `data_4`/OCR problem — `data_4`
-actually ranks *best* of the four). The honest next step is finer-grained chunking
-of the ratios sub-section; we documented it rather than shipping a rushed change.
+**Weak spot — the main one (RESOLVED in §3b):** the dense "Analytical Ratios" block
+(CAR, EPS, NPA, RoA, net worth) was so number-heavy that the discriminating phrase (e.g.
+"Capital Adequacy Ratio") got diluted, and adjacent ratios landed in different chunks, so
+value-row lookups ranked below prose and often fell outside the top-k (the token-free
+harness measured **10/17** answer chunks in the top-8). The fix — finer-grained,
+table-aware chunking and ranking — is described in §3b: the same harness now gives
+**15/17**.
+
+---
+
+## 3b. Table-aware retrieval — the fix for the §3 weak spot
+
+**Diagnosis first (real index, 224 chunks).** For the failing questions the answer chunk
+ranked 57th–153rd on cosine similarity and as low as 285th on BM25. Two causes:
+1. *Dilution.* One ~1,000-character OCR blob held the net-profit row, the CAR row, EPS and
+   ten other rows, so its embedding was a blur.
+2. *Shared prefix + query noise.* Every chunk of a filing begins with the same doc-label and
+   column header, and the question's own "March 31, 2026" / "HDFC Bank" / "year ended"
+   matched *that* better than the metric ("net profit") did.
+
+**What changed** (each step measured on the harness; the ones that didn't help were dropped):
+- **Row chunks.** Every table row (`label + run of ≥3 numbers`) is *also* indexed on its own,
+  split from the whole page's token stream so OCR-glued rows and rows cut by a blank line
+  stay whole. Page-level chunks stay for context. Rows are **embedded from their label words
+  only** — not the shared prefix, not the numbers — while the full row is what's stored and
+  shown. *(Row chunks alone: 10/17 → 11/17. The embedding-text change is what made them
+  findable.)*
+- **Column-labelled values.** A row is rendered `label | Quarter ended March 31, 2026: 19221.05
+  | … | Year ended March 31, 2026: 74671.29`. Column roles come from the header's group words
+  (Quarter / Half year / Nine months / Year ended → 3/2/1 columns) and the column dates from
+  the filing's *detected period* — not the OCR'd header, whose dates are sometimes misread
+  (real OCR read the year-ago column as 31.03.2026). If the layout doesn't fit it never
+  guesses: the raw row + header is kept. This removed the "which of five bare numbers is the
+  full-year one?" failure (the LLM had answered the quarter column for a full-year question).
+- **Period / statement awareness.** The question's period ("March 31, 2026", "FY2026",
+  "Q2, Q3 and Q4 of FY2026", "July–September 2025") and statement type ("consolidated",
+  "Group") are resolved to metadata and give a small score bonus (`PERIOD_BOOST`) to matching
+  filings — and are *stripped* from the text used for matching, separating *what* was asked
+  from *when*.
+- **Focused queries.** Stopwords and terms present in >50% of **page-level** chunks ("bank",
+  "year", "ended") are dropped before ranking — corpus-derived, no hand-written list. *(First
+  tried 25% over all chunks: row chunks diluted the ratios of page-only terms, and at 25% the
+  metric words themselves — "net" 28%, "profit" 26% of pages — were at risk. Document
+  frequency is also skipped on corpora under 50 page chunks, where it is meaningless.)*
+- **Separate rankings per chunk type.** Row and page-level chunks are ranked in separate lists
+  before rank fusion: a short label-only row and a long page chunk have cosines on different
+  scales, so in one mixed list the page chunks crowded the rows out regardless of relevance.
+  *(Down-weighting the row lists to 0.7 to protect prose answers cost the net-profit and
+  consolidated rows their top-8 places, so the default stays 1.0 — `ROW_WEIGHT`.)*
+- **Prompt.** Tells the model rows are column-labelled ("answer from the matching column")
+  and that these filings use an April–March fiscal year (Q4 = March 31).
+
+**Results.**
+
+| Measure (real index, real Groq `openai/gpt-oss-120b`) | before | after |
+|---|---|---|
+| Token-free harness: answer chunk in top-8 | 10 / 17 | **15 / 17** |
+| Live run, 15 questions: correct answers | 10 answered/declined as expected, incl. a *wrong* net profit (Rs 3,512.96 cr) | **14 correct**, 3 correct declines, 0 false declines |
+
+`run_batch.py` now checks that the answer contains the expected value, so a confidently wrong
+answer can no longer count as a pass (it previously did).
+
+**Still weak (honest list).**
+- *Pure paraphrase* with no shared vocabulary — "what fraction of loans have gone bad" vs the
+  row "% of Gross NPAs to Gross Advances" (harness Q6). bge-small doesn't bridge it; an LLM
+  query-rewrite step would, at the cost of an extra call per question — not added.
+- *Broad "summarise the notes"* questions (Q15) retrieve prose chunks poorly in the top-8.
+- *Line-item ambiguity.* Q17 asks the Group's net profit; the harness expects 79,219.46
+  ("after tax and **before** minority interest") but the model answers 76,025.97 (the final
+  "Net profit for the period", after minority interest) — defensible, and not changed here.
+- Pages whose column header OCR can't be detected (e.g. the first consolidated page) fall back
+  to unlabelled rows.
+- Only the Indian-bank column layout (3/2/1 columns) is recognised; other layouts fall back
+  safely but get no labels.
+- Requires re-running `python ingest.py` (index grew 224 → 949 chunks; ~110 s).
 
 ---
 
@@ -188,12 +254,12 @@ rendering satisfies "render the model's text safely."
 
 ## 9. Known limitations (the honest list)
 
-1. **Dense value-row retrieval** (§3) — CAR / net-profit rows can rank outside the
-   top-k; ~10/17 value-row questions retrieve the exact answer chunk. Real fix:
-   finer chunking of the ratios block. Affects all docs, not just the OCR'd one.
+1. **Dense value-row retrieval** (§3) — largely fixed by §3b (harness 10/17 → 15/17; live
+   run 14/15 correct). Remaining: pure-paraphrase questions (Q6), broad summaries (Q15), and
+   line-item ambiguity (Q17).
 2. **Standalone vs consolidated** — both appear in the same filing; the metadata
-   label helps the LLM distinguish them, but a buried value row can still cause a
-   wrong-statement answer.
+   label helps the LLM distinguish them, and a question naming one now boosts that statement
+   type (§3b); a question naming neither can still get either.
 3. **OCR noise** on `data_4` — numbers are accurate, surrounding words can be
    mangled; `_deglue` mitigates but doesn't eliminate it.
 4. **LLM non-determinism** and the **Groq free daily token cap** (~100k/day) —

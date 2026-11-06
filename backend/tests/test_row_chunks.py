@@ -54,12 +54,12 @@ def test_a_row_cut_by_a_blank_line_stays_whole():
     assert any("Net Profit" in r and "500.5" in r for r in rows), rows
 
 
-def test_row_chunks_carry_label_header_and_provenance():
+def test_row_chunks_carry_label_columns_and_provenance():
     out = [c for c in chunk_page(_page()) if c.chunk_type == "row"]
     assert out
     np_row = next(c for c in out if "Net Profit forthe period" in c.text)
     assert np_row.text.startswith("Standalone Results — March 31, 2026")
-    assert "Quarterended" in np_row.text            # period header re-attached
+    assert "Year ended March 31, 2026: 74671.29" in np_row.text   # values paired with their columns (see test_column_labels.py)
     assert np_row.doc == "d.pdf" and np_row.page == 1 and np_row.source == "ocr"
     assert np_row.statement_type == "standalone" and np_row.fiscal_period == "March 31, 2026"
     assert len({c.id for c in out}) == len(out)     # ids unique

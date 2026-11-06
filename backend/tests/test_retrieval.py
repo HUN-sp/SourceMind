@@ -38,4 +38,4 @@ def test_metadata_is_populated_on_results():
     r = res[0]
     assert r.doc_label                      # human-readable citation label present
     assert r.statement_type in ("standalone", "consolidated", "")
-    assert r.chunk_type in ("table", "prose", "")
+    assert r.chunk_type in ("table", "row", "prose", "")

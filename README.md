@@ -21,6 +21,8 @@ data/*.pdf                                   POST /ask {question}
   │ derive metadata (statement type,           │   vector (cosine) + BM25 keyword
   │   period, doc label) from headers          │   fused by Reciprocal Rank Fusion
   │ chunk per page (≤350 tok, header-attached) │   + recency tiebreak
+  │ + one chunk per TABLE ROW (values labelled │   + period/statement-aware bonus
+  │   by column, embedded from the label)      │   (rows & pages ranked separately)
   │ embed (local bge-small) + store            │
   ▼                                            │ GATE 1: best similarity < floor → refuse
 storage/index/                                 │ build numbered, labelled context
@@ -39,7 +41,7 @@ reason similarity search is meaningful. Full rationale for every choice is in
 | PDF parsing | `pdfplumber` (layout-preserving) + RapidOCR fallback for scans |
 | Embeddings | `BAAI/bge-small-en-v1.5` (local, free, no key) |
 | Vector store | exact cosine over a NumPy matrix (no native deps) |
-| Keyword search | `rank-bm25`, fused with vectors via Reciprocal Rank Fusion |
+| Keyword search | `rank-bm25`, fused with vectors via Reciprocal Rank Fusion (row and page chunks ranked separately; period/statement-aware) |
 | LLM | Groq free tier (`openai/gpt-oss-120b`; override with `LLM_MODEL`), temperature 0, JSON mode |
 | Backend | FastAPI (`/health`, `/documents`, `/ask`) |
 | Frontend | React + Vite |
@@ -68,7 +70,7 @@ cp ../.env.example ../.env          # then edit ../.env and paste your GROQ_API_
 python ingest.py
 ```
 This parses every PDF in `../data`, OCRs scanned pages, chunks, embeds, and writes
-the index to `../storage/index`. The first run downloads the embedding model
+the index to `../storage/index` (949 chunks: page-level chunks plus one chunk per table row). The first run downloads the embedding model
 (~130 MB) and OCRs the scanned PDF, so it takes a few minutes. Re-run it whenever
 the documents or chunking change.
 
@@ -101,8 +103,8 @@ cd backend
 # See exactly what retrieval returns for a question (no LLM call):
 python query.py "What is the gross NPA ratio?" --k 8
 
-# Token-free retrieval harness: does the answer chunk land in the top-8 for the
-# 20-question evaluation bank? Great fast feedback loop while tuning.
+# Token-free retrieval harness (15/17 on the real index since the table-aware retrieval
+# work): does the answer chunk land in the top-8 for the 20-question evaluation bank? Great fast feedback loop while tuning.
 python retrieval_harness.py
 python retrieval_harness.py --rerank     # A/B with the cross-encoder reranker on
 
@@ -121,7 +123,7 @@ CI (`.github/workflows/ci.yml`) runs the offline backend suite (a light install 
 
 End-to-end question runs that DO call the LLM:
 ```bash
-python run_batch.py      # runs the evaluation question bank against the live API
+python run_batch.py      # runs the evaluation bank against the live API; PASS requires the correct value
 ```
 > Note: the Groq free tier has a ~100k-tokens/day cap. Each answer sends several
 > document chunks as context, so a long testing session can exhaust the daily
@@ -136,7 +138,9 @@ All tunables live in `backend/rag/config.py`, overridable via `.env` (see
 [`.env.example`](.env.example)). Key knobs: `TOP_K`, `MIN_SIMILARITY` (grounding
 floor), `USE_HYBRID`, `RRF_K`, `RECENCY_BOOST`, `USE_RERANKER` (off by default),
 plus the API guards `MAX_QUESTION_CHARS`, `RATE_LIMIT_PER_MINUTE` and the answer cache
-size `CACHE_SIZE`. A malformed numeric value fails at startup naming the variable.
+size `CACHE_SIZE`. Table-aware retrieval knobs: `ROW_CHUNKS` (needs a re-ingest), `ROW_WEIGHT`,
+`PERIOD_BOOST`, `FOCUS_QUERY`, `COMMON_TERM_RATIO` — see [DECISIONS.md §3b](DECISIONS.md). A malformed
+numeric value fails at startup naming the variable.
 
 ## API reference
 

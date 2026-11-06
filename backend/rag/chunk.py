@@ -102,16 +102,12 @@ _MIN_VALUES = 3                                      # a value run needs >=3 num
 _LABEL_MAX_WORDS = 40                                # keep the words nearest the values
 
 
-def split_rows(text: str) -> list[str]:
-    """Split a page's text into table rows: `<label words> <run of >=3 numbers>`.
-
-    Works on the WHOLE page's flattened token stream, so it copes with how OCR
-    delivers tables — several rows glued onto one line, and rows cut in two by a
-    blank line. The header's date row (all dates) is dropped; a long preceding
-    label is trimmed to its last words."""
+def split_row_parts(text: str) -> list[tuple[list[str], list[str]]]:
+    """Like split_rows but returns (label_words, value_tokens) per row, so callers can
+    pair each value with its column."""
     tokens = text.split()
     n = len(tokens)
-    rows: list[str] = []
+    rows: list[tuple[list[str], list[str]]] = []
     label: list[str] = []
     i = 0
     while i < n:
@@ -122,7 +118,7 @@ def split_rows(text: str) -> list[str]:
             while k < n and tokens[k].lower() in _PLACEHOLDERS:
                 k += 1
             if k - i >= _MIN_VALUES:
-                rows.append(" ".join(label[-_LABEL_MAX_WORDS:] + tokens[i:k]))
+                rows.append((label[-_LABEL_MAX_WORDS:], tokens[i:k]))
                 label = []
                 i = k
                 continue
@@ -144,10 +140,69 @@ def split_rows(text: str) -> list[str]:
             run = run[:-1]
             numeric = [t for t in run if _NUM.match(t)]
         if not all(_DATE.match(t) for t in numeric):     # skip the column-header date row
-            rows.append(" ".join(label[-_LABEL_MAX_WORDS:] + run))
+            rows.append((label[-_LABEL_MAX_WORDS:], run))
         label = []
         i = j
     return rows
+
+
+def split_rows(text: str) -> list[str]:
+    """Split a page's text into table rows: `<label words> <run of >=3 numbers>`.
+
+    Works on the WHOLE page's flattened token stream, so it copes with how OCR
+    delivers tables — several rows glued onto one line, and rows cut in two by a
+    blank line. The header's date row (all dates) is dropped; a long preceding
+    label is trimmed to its last words."""
+    return [" ".join(label + values) for label, values in split_row_parts(text)]
+
+
+# --- Column labels ------------------------------------------------------------------
+# Indian results tables: "Quarter ended" = 3 columns (current, previous quarter, year-ago
+# quarter); each further group ("Half year ended" / "Nine months ended" / "Year ended") =
+# 2 columns (current, previous year) and, if a third group exists, 1. We pair every value
+# with its column so the LLM doesn't have to infer which bare number is which. Dates come
+# from the filing's detected period, NOT the OCR'd header (real OCR misread them).
+_GROUP_RE = re.compile(r"(halfyear|ninemonths|quarter|year)ended")
+_GROUP_TITLE = {"quarter": "Quarter ended", "halfyear": "Half year ended",
+                "ninemonths": "Nine months ended", "year": "Year ended"}
+_GROUP_SIZES = (3, 2, 1)
+_GROUP_OFFSETS = {3: (0, 3, 12), 2: (0, 12), 1: (0,)}      # months back from the filing period
+_MONTH_NAMES = ["January", "February", "March", "April", "May", "June", "July", "August",
+                "September", "October", "November", "December"]
+_PERIOD_TEXT = re.compile(r"^(" + "|".join(_MONTH_NAMES) + r")\s+(\d{1,2}),\s*(\d{4})$")
+
+
+def _shift_period(period: str, months_back: int) -> str | None:
+    """'March 31, 2026' shifted back N months -> 'December 31, 2025' (month-end)."""
+    import calendar
+
+    m = _PERIOD_TEXT.match((period or "").strip())
+    if not m:
+        return None
+    total = int(m.group(3)) * 12 + _MONTH_NAMES.index(m.group(1)) - months_back
+    year, month0 = divmod(total, 12)
+    return f"{_MONTH_NAMES[month0]} {calendar.monthrange(year, month0 + 1)[1]}, {year}"
+
+
+def column_labels(header: str | None, n_values: int, fiscal_period: str) -> list[str] | None:
+    """Labels like 'Year ended March 31, 2026' for a row's `n_values` columns, or None
+    when the layout can't be determined with confidence (never guesses)."""
+    if not header or not _PERIOD_TEXT.match((fiscal_period or "").strip()):
+        return None
+    groups = _GROUP_RE.findall(re.sub(r"\s+", "", header).lower())
+    if not groups or len(groups) > len(_GROUP_SIZES):
+        return None
+    sizes = _GROUP_SIZES[: len(groups)]
+    if sum(sizes) != n_values:
+        return None
+    labels: list[str] = []
+    for group, size in zip(groups, sizes):
+        for back in _GROUP_OFFSETS[size]:
+            labels.append(f"{_GROUP_TITLE[group]} {_shift_period(fiscal_period, back)}")
+    return labels
+
+
+_COL_SEP = " | "   # separates a rendered row's label from its labelled values
 
 
 def embedding_text(chunk: Chunk) -> str:
@@ -157,7 +212,7 @@ def embedding_text(chunk: Chunk) -> str:
     semantics, only noise). The full text is still what's stored, shown and BM25-indexed."""
     if chunk.chunk_type != "row":
         return chunk.text
-    row = chunk.text.rsplit("\n", 1)[-1]
+    row = chunk.text.rsplit("\n", 1)[-1].split(_COL_SEP, 1)[0]   # rendered rows: label part only
     words = [t for t in row.split() if not _NUM.match(t) and t.lower() not in _PLACEHOLDERS]
     return " ".join(words) or row
 
@@ -290,13 +345,17 @@ def chunk_page(page: Page) -> list[Chunk]:
     # Row-level chunks (see split_rows). Same provenance as the page; header re-attached
     # so the numbers still line up with their period columns.
     if CONFIG.row_chunks:
-        rows = split_rows(page.text)
-        if len(rows) >= 2:
-            for r_idx, row in enumerate(rows):
+        parts_list = split_row_parts(page.text)
+        if len(parts_list) >= 2:
+            for r_idx, (label, values) in enumerate(parts_list):
+                cols = column_labels(header, len(values), page.fiscal_period)
                 parts = [page.doc_label] if page.doc_label else []
-                if header:
-                    parts.append(header)
-                parts.append(row)
+                if cols:   # self-describing: each value next to its column; the OCR header is redundant
+                    parts.append(_COL_SEP.join([" ".join(label)] + [f"{c}: {v}" for c, v in zip(cols, values)]))
+                else:      # fall back to the raw row + the (re-attached) period header
+                    if header:
+                        parts.append(header)
+                    parts.append(" ".join(label + values))
                 out.append(
                     Chunk(
                         id=f"{page.doc}::p{page.page}::r{r_idx}",

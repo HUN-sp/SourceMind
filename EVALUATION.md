@@ -9,7 +9,10 @@ documents).
 
 > **Note:** the results below were produced with `llama-3.3-70b-versatile`, which Groq has
 > since retired. A re-run with `openai/gpt-oss-120b` is summarised in
-> [`docs/PROGRESS.md`](docs/PROGRESS.md) §7 (same retrieval weaknesses, incl. a wrong net-profit answer).
+> [`docs/PROGRESS.md`](docs/PROGRESS.md) §7. After the table-aware retrieval work
+> ([DECISIONS.md §3b](DECISIONS.md)) Q9 (net profit) and Q10-style value lookups are answered
+> correctly in a live run (14 of 15 questions correct, 0 false refusals; the one miss is a
+> line-item ambiguity), so the "known weakness" verdicts below describe the earlier system.
 
 > Where retrieval is fragile, results can vary slightly between runs (LLM
 > non-determinism + borderline ranking). We note those cases honestly rather than

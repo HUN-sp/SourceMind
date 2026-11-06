@@ -206,6 +206,44 @@ different model and is NOT a record of this model's behaviour.**
 - **Security housekeeping:** the Groq key was pasted into the chat; rotate it at
   console.groq.com/keys if that matters to you.
 
+## 7b. Retrieval-layer fix (requested by the owner after the real run)
+
+Goal: fix the dense-value-row weakness found in §7 (wrong/missing net profit, CAR, etc.).
+Full write-up with what was tried and dropped: **DECISIONS.md §3b**. Summary:
+
+- [x] Diagnosed on the real index: answer chunks ranked 57th-153rd/224 on cosine (BM25 up to
+  285th) — dilution in ~1000-char OCR blobs + a shared label/header prefix matching the
+  question's own period/entity words.
+- [x] Row-level chunks (`split_row_parts`), embedded from label words only (`embedding_text`).
+- [x] Column-labelled rows (`column_labels`): "Year ended March 31, 2026: 74671.29", dates
+  from the detected filing period (OCR header dates are unreliable).
+- [x] Query periods + statement type -> soft metadata bonus; stripped from the search text
+  (`parse_query_periods`, `query_statement`; handles FY2026, Q2-Q4 FY2026, July-September 2025).
+- [x] Focused queries (`focus_query`; corpus-adaptive, df over page-level chunks).
+- [x] Row/page chunks ranked in separate lists before RRF (+ optional `ROW_WEIGHT`).
+- [x] Prompt: column-labelled rows + April-March fiscal quarters.
+- [x] `run_batch.py` PASS now requires the expected value (it used to accept a wrong figure).
+- Tried and dropped: row weight 0.7 (lost net-profit/consolidated rows), df threshold 25% over
+  all chunks (row chunks diluted the ratio; "net"/"profit" were at risk).
+
+**Measured on the real index + real Groq (`openai/gpt-oss-120b`):**
+
+| | before | after |
+|---|---|---|
+| Token-free harness (answer chunk in top-8) | 10/17 | **15/17** |
+| Live `run_batch.py`, 15 questions | 5 false refusals + 1 *wrong* answer hidden as "PASS" | **14 correct**, 3 correct declines, **0 false refusals**, 1 ambiguous (Q17) |
+
+Per-step harness trace: 10 -> 11 (row chunks + label-only embedding) -> 14 (period/statement
+bonus + focused query + separate rankings) -> 15 (multi-quarter periods). Live trace: 12 correct
+(+3 wrong) -> 14 correct after column labelling.
+
+**Remaining / not fixed:** Q6 pure paraphrase ("loans gone bad"), Q15 broad notes summary, Q17
+line-item ambiguity (expected 79,219.46 = *before* minority interest; model gave 76,025.97 =
+final "net profit for the period" — arguably the better answer; expectation deliberately NOT
+changed), consolidated page 11 has no detectable header so its rows stay unlabelled.
+**Anyone upgrading must re-run `python ingest.py`** (index 224 -> 949 chunks, ~110 s); an old
+index still works but gets none of the row-level benefit.
+
 ## 8. Decisions made while working autonomously
 - **Branch:** the task named `claude/sourcemind-improvements` explicitly, so work was done
   there (not on the session's default `claude/exciting-darwin-r8yf2s`). Never pushed to `main`.
@@ -221,5 +259,5 @@ different model and is NOT a record of this model's behaviour.**
 - No features were removed.
 
 ## 9. Final status
-- Backend: `pytest` → 159 passed (with the real index built); offline/CI-style run → 152 passed, 7 `real_index` skipped.
+- Backend: `pytest` → 232 passed, 0 skipped (real index + real models); the light CI-style install (`requirements-ci.txt`) → 225 passed, 7 `real_index` skipped.
 - Frontend: `npm test` → 27 passed; `npm run build` OK.
