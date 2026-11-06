@@ -1,0 +1,14 @@
+# Lightweight set for CI / quick local test runs: everything the OFFLINE test-suite
+# imports, WITHOUT the heavy ML/OCR stack (torch, sentence-transformers, RapidOCR,
+# PyMuPDF). Tests use fake models (see conftest.py), so those aren't needed.
+# Versions must match requirements.txt (enforced by tests/test_requirements.py).
+numpy
+pdfplumber==0.11.4
+rank-bm25==0.2.2
+fastapi==0.162.0
+uvicorn[standard]==0.54.0
+pydantic==2.14.3
+python-dotenv==1.2.4
+groq==1.7.0
+pytest==9.2.0
+httpx==0.28.1

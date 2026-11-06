@@ -194,8 +194,9 @@ Phase 4, but we never rely on it alone.
   whole pipeline with no API key and no network (that's how Phase 2 was verified).
 - **Provider isolation**: swapping Groq → OpenAI → local Ollama is a one-function
   change in `generate.py`. Nothing else knows which model answers.
-- **Error handling**: a dead key / rate limit raises `LLMError` → the API returns
-  a clean **502** with a helpful message, not a stack trace. Empty question → 422.
+- **Error handling**: provider failures become typed `LLMError`s → the API returns a
+  clean **429** (rate limit / quota), **503** (no key / index not built) or **502**
+  (provider down) with a safe message, not a stack trace. Empty/over-long question → 422.
 
 ### Debugging lessons from Phase 2 (THIS is the interview gold)
 The brief says it hires for "knowing why a naive version retrieves the wrong

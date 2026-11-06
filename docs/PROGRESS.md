@@ -146,11 +146,12 @@ Chosen for real users, in build order. `[x]` = built, tested and committed.
   AbortSignal support), a Copy-answer button (answer + citations), and an "Instant answer"
   badge for cache hits. (Scope changed from "period tags": a source card's title already
   carries statement type + period via `doc_label`, so that would have been redundant.)
-- [ ] **E5 CI + docs refresh** — GitHub Actions running the offline backend tests and the
+- [x] **E5 CI + docs refresh** — GitHub Actions running the offline backend tests and the
   frontend tests/build on every push/PR; README gets the API reference, test instructions
   and new config knobs.
 
 ### Enhancement log
+- E5 built: `.github/workflows/ci.yml` (offline backend suite from `backend/requirements-ci.txt` + frontend `npm ci`/test/build); `tests/test_requirements.py` keeps CI pins in sync; README gained the API reference, test/CI instructions and new knobs; stale 502 wording fixed in README/DECISIONS/ARCHITECTURE/STUDY_GUIDE. Verified locally in a fresh venv (149 passed) and fresh `npm ci`; the workflow itself has NOT run on GitHub yet.
 - E4 built: Cancel button during a request (no error shown on cancel), Copy-answer button (`formatForCopy`), "Instant answer" badge; `AnswerPanel.test.jsx` + cancel test in `App.test.jsx`.
 - E3 built: `/health` now returns `ready`, `problems[]`, `llm_configured` (never the key); UI shows a "Setup needed" banner (backend unreachable / index missing / no API key); bare 5xx from the dev proxy now says to check the backend. Tests in `test_api.py`, `App.test.jsx`, `api.test.js`.
 - E2 built: `rag/cache.py` LRU (`CACHE_SIZE`, default 128, 0 = off) in front of `/ask`; only answered results cached, keyed on normalised (question, doc) + index generation; `cached` flag in the response and cache stats in `/health`. `backend/tests/test_cache.py`.

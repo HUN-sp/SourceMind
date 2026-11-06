@@ -197,4 +197,4 @@ rendering satisfies "render the model's text safely."
 3. **OCR noise** on `data_4` — numbers are accurate, surrounding words can be
    mangled; `_deglue` mitigates but doesn't eliminate it.
 4. **LLM non-determinism** and the **Groq free daily token cap** (~100k/day) —
-   account limits, not bugs; the API degrades cleanly to a 502.
+   account limits, not bugs; the API degrades cleanly (429 for a used-up quota, 502 if the model is unreachable).

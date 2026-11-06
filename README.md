@@ -41,7 +41,7 @@ reason similarity search is meaningful. Full rationale for every choice is in
 | Vector store | exact cosine over a NumPy matrix (no native deps) |
 | Keyword search | `rank-bm25`, fused with vectors via Reciprocal Rank Fusion |
 | LLM | Groq free tier (`llama-3.3-70b-versatile`), temperature 0, JSON mode |
-| Backend | FastAPI (`/health`, `/ask`) |
+| Backend | FastAPI (`/health`, `/documents`, `/ask`) |
 | Frontend | React + Vite |
 
 ---
@@ -81,8 +81,7 @@ python ingest.py --stats     # print page/chunk stats without indexing
 # from backend/
 uvicorn app:app --reload --port 8000
 ```
-- `GET  http://localhost:8000/health` → index + model status
-- `POST http://localhost:8000/ask` with `{"question": "..."}` → `{answer, sources[], refused}`
+See [API reference](#api-reference) below. Quick check: `curl http://localhost:8000/health`.
 
 ### 4. Run the frontend
 ```bash
@@ -107,9 +106,18 @@ python query.py "What is the gross NPA ratio?" --k 8
 python retrieval_harness.py
 python retrieval_harness.py --rerank     # A/B with the cross-encoder reranker on
 
-# Automated tests (chunking/provenance, retrieval, API/grounding):
-pytest
+# Automated backend tests — fully OFFLINE (fake embedder/tokenizer/LLM, synthetic
+# index; no model download, no API key, no built index needed):
+pytest                      # from backend/   (pip install -r requirements-dev.txt)
+# Tests tagged `real_index` (tests/test_retrieval.py, tests/test_pipeline.py) use the
+# real model + your built index and are skipped until you run `python ingest.py`.
+
+# Frontend tests (Vitest + Testing Library) and a production build check:
+cd ../frontend && npm test && npm run build
 ```
+
+CI (`.github/workflows/ci.yml`) runs the offline backend suite (a light install from
+`backend/requirements-ci.txt`) and the frontend tests/build on every push and PR.
 
 End-to-end question runs that DO call the LLM:
 ```bash
@@ -117,8 +125,8 @@ python run_batch.py      # runs the evaluation question bank against the live AP
 ```
 > Note: the Groq free tier has a ~100k-tokens/day cap. Each answer sends several
 > document chunks as context, so a long testing session can exhaust the daily
-> budget — at which point the API returns a clean "model unavailable" 502 (not a
-> crash). Use a fresh key or wait for the daily reset to continue.
+> budget — at which point the API returns a clean 429 "quota used up" (not a
+> crash); repeated questions are served from the answer cache and cost no tokens. Use a fresh key or wait for the daily reset to continue.
 
 ---
 
@@ -126,7 +134,25 @@ python run_batch.py      # runs the evaluation question bank against the live AP
 
 All tunables live in `backend/rag/config.py`, overridable via `.env` (see
 [`.env.example`](.env.example)). Key knobs: `TOP_K`, `MIN_SIMILARITY` (grounding
-floor), `USE_HYBRID`, `RRF_K`, `RECENCY_BOOST`, `USE_RERANKER`.
+floor), `USE_HYBRID`, `RRF_K`, `RECENCY_BOOST`, `USE_RERANKER` (off by default),
+plus the API guards `MAX_QUESTION_CHARS`, `RATE_LIMIT_PER_MINUTE` and the answer cache
+size `CACHE_SIZE`. A malformed numeric value fails at startup naming the variable.
+
+## API reference
+
+| Endpoint | Purpose |
+|---|---|
+| `GET /health` | `{status, ready, problems[], llm_configured, indexed_chunks, model, embedding_model, cache}`. `ready:false` lists what to fix (index not built, no API key). Never returns the key. |
+| `GET /documents` | `{documents: [{doc, doc_label, fiscal_period, pages, chunks}]}` — what's indexed; used by the UI's "Search in" picker. |
+| `POST /ask` | Body `{question, doc?}` → `{answer, sources[{doc, page, snippet, similarity, doc_label, statement_type, fiscal_period}], refused, cached}`. |
+
+`/ask` status codes: `200` answered **or** honestly refused (`refused: true`); `404` unknown `doc`;
+`422` empty / over-long question; `429` too many requests or the LLM's quota is used up
+(with `Retry-After`); `502` model unreachable or erroring; `503` index not built / no API key.
+Error `detail` text is safe to show to users (raw provider errors are only logged).
+
+Repeating a question is answered from an in-memory cache (`cached: true`, no LLM tokens
+spent); refusals are never cached.
 
 ## Repo layout
 ```
@@ -137,9 +163,12 @@ backend/
   ingest.py           PDF -> index CLI
   query.py            retrieval inspector
   retrieval_harness.py token-free top-k evaluation
-  rag/                config, extract, chunk, embed, store, generate, pipeline
-  tests/              pytest suite
-frontend/             React + Vite UI
+  rag/                config, extract, chunk, embed, store, generate, pipeline,
+                      cache (answer LRU), ratelimit (per-IP throttle)
+  tests/              offline pytest suite (see conftest.py for the fake models)
+  requirements*.txt   runtime / dev / light CI dependency sets
+frontend/             React + Vite UI (npm test = Vitest)
+.github/workflows/    CI
 docs/                 ARCHITECTURE.md, JOURNEY.md, STUDY_GUIDE.md
 DECISIONS.md          why each choice was made (read this)
 EVALUATION.md         8+ questions with answers, sources, honest verdicts
