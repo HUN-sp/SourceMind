@@ -61,7 +61,7 @@ Legend: `[ ]` open, `[x]` fixed. Severity: **H**igh / **M**edium / **L**ow.
 - [x] **H4** `backend/rag/store.py:87` + `backend/app.py:81-86` — if the index isn't
   built, `/ask` raises an unhandled `FileNotFoundError` → bare HTTP 500; `/health`
   (`app.py:69-74`) still reports `"status": "ok"`.
-- [ ] **H5** `backend/rag/pipeline.py:126-133,176,185` — `parse_llm_json` accepts any JSON
+- [x] **H5** `backend/rag/pipeline.py:126-133,176,185` — `parse_llm_json` accepts any JSON
   value; if the model returns a list/string, or `used_passages` is a non-list (e.g. `3`),
   `data.get` / iteration raises → HTTP 500 instead of the documented fail-safe refusal.
 - [ ] **H6** `backend/app.py:33` — no max length on `question` (unbounded text goes to the
@@ -116,6 +116,7 @@ Legend: `[ ]` open, `[x]` fixed. Severity: **H**igh / **M**edium / **L**ow.
 - H3 fixed: `.env.example` now ships `USE_RERANKER=false`; `tests/test_env_example.py` keeps `.env.example` and code defaults in sync.
 - M7 (partial): added hermetic fixtures in `conftest.py` (fake tokenizer + hash embedder + synthetic `tiny_index`); real-model tests carry `@pytest.mark.real_index`. `tests/test_chunking.py` now passes without HuggingFace.
 - H4 fixed: missing index -> `/ask` returns 503 with a clear message (new `IndexNotBuiltError`), `/health` reports `index_missing`; tests in `tests/test_api.py`.
+- H5 fixed: `parse_llm_json` rejects non-object JSON; strict `not_covered` and `used_passages` handling (a `"false"` string used to cause a refusal; scalar/garbage `used_passages` used to 500). `tests/test_llm_parsing.py`.
 
 ## 6. Enhancements — Phase 3
 (chosen after Phase 2)

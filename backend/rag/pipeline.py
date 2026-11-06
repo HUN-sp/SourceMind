@@ -124,15 +124,45 @@ def build_user_prompt(question: str, chunks: list[Retrieved]) -> str:
 
 
 def parse_llm_json(raw: str) -> dict:
-    """Parse the model's JSON. Tolerant of stray text around the object."""
+    """Parse the model's JSON object. Tolerant of stray text around the object.
+
+    Raises ValueError (JSONDecodeError is a subclass) for anything that isn't a
+    JSON *object* — a bare list/string/number would otherwise crash the caller."""
     raw = raw.strip()
     try:
-        return json.loads(raw)
+        data = json.loads(raw)
     except json.JSONDecodeError:
         start, end = raw.find("{"), raw.rfind("}")
-        if start != -1 and end != -1 and end > start:
-            return json.loads(raw[start : end + 1])
-        raise
+        if start == -1 or end <= start:
+            raise
+        data = json.loads(raw[start : end + 1])
+    if not isinstance(data, dict):
+        raise ValueError(f"expected a JSON object, got {type(data).__name__}")
+    return data
+
+
+def _flag(value) -> bool:
+    """Strict boolean: only true / "true" count. A string like "false" is truthy in
+    Python, which would wrongly turn an answer into a refusal."""
+    if isinstance(value, str):
+        return value.strip().lower() == "true"
+    return value is True
+
+
+def _used_indices(used) -> set[int]:
+    """0-based indices from the model's `used_passages`. Accepts a list of ints or
+    digit strings (or a single int); silently ignores anything malformed."""
+    if isinstance(used, int) and not isinstance(used, bool):
+        used = [used]
+    if not isinstance(used, list):
+        return set()
+    out = set()
+    for n in used:
+        if isinstance(n, bool):
+            continue
+        if isinstance(n, int) or (isinstance(n, str) and n.strip().isdigit()):
+            out.add(int(n) - 1)
+    return out
 
 
 def ask(
@@ -173,7 +203,7 @@ def ask(
         )
 
     # --- Gate #2: the LLM judged the passages insufficient.
-    if data.get("not_covered") or not str(data.get("answer", "")).strip():
+    if _flag(data.get("not_covered")) or not str(data.get("answer", "")).strip():
         return AskResult(
             answer=REFUSAL_MESSAGE, sources=[], refused=True,
             retrieved=chunks, top_similarity=top_sim,
@@ -181,8 +211,7 @@ def ask(
 
     # --- Map the passages the model actually used (numbered over `ordered`) back to
     # citations.
-    used = data.get("used_passages") or []
-    used_idx = {int(n) - 1 for n in used if str(n).strip().isdigit()}
+    used_idx = _used_indices(data.get("used_passages"))
     cited = [ordered[i] for i in sorted(used_idx) if 0 <= i < len(ordered)]
     if not cited:  # model answered but forgot to cite -> fall back to the best hit
         cited = [max(chunks, key=lambda c: c.similarity)]
