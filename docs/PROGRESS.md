@@ -72,7 +72,7 @@ Legend: `[ ]` open, `[x]` fixed. Severity: **H**igh / **M**edium / **L**ow.
 - [x] **M1** `backend/rag/store.py:71-73` — index written non-atomically (`.npy` then
   `.json`); an interrupted ingest leaves a mismatched pair that loads silently
   (`store.py:90-93` never checks `len(emb) == len(meta)`).
-- [ ] **M2** `backend/ingest.py:46` — `min(tok_counts)` raises `ValueError` when there are
+- [x] **M2** `backend/ingest.py:46` — `min(tok_counts)` raises `ValueError` when there are
   zero chunks (all pages empty); `backend/rag/extract.py:210-211` — one unreadable PDF
   aborts the whole ingest with a raw traceback.
 - [ ] **M3** `backend/rag/chunk.py:150` — oversized-block splitter can append an empty
@@ -119,6 +119,7 @@ Legend: `[ ]` open, `[x]` fixed. Severity: **H**igh / **M**edium / **L**ow.
 - H5 fixed: `parse_llm_json` rejects non-object JSON; strict `not_covered` and `used_passages` handling (a `"false"` string used to cause a refusal; scalar/garbage `used_passages` used to 500). `tests/test_llm_parsing.py`.
 - H6 fixed: `MAX_QUESTION_CHARS` (default 1000, 422 above) and per-IP `RATE_LIMIT_PER_MINUTE` (default 30, 429 + Retry-After) on `/ask` via new `rag/ratelimit.py`; `tests/test_limits.py`. Limiter is in-memory, per process, keyed on the socket IP (behind a reverse proxy, rate-limit at the proxy).
 - M1 fixed: index written via temp files + `os.replace`; `_load()` validates embeddings/chunks agree (`IndexCorruptError` -> 503 with re-ingest hint); empty chunk list rejected. `tests/test_store_index.py`.
+- M2 fixed: `extract_corpus` skips (and logs) unreadable PDFs and raises a clear `RuntimeError` if nothing is usable; `ingest.py` refactored into `run()` returning an exit code (no more `min([])` crash, no `__import__` hack -> also closes L1 ingest half). Tests: `test_extract_robustness.py`, `test_ingest_cli.py`.
 
 ## 6. Enhancements — Phase 3
 (chosen after Phase 2)

@@ -20,6 +20,7 @@ The same logic would work on a brand-new scanned document the reviewer swaps in.
 """
 from __future__ import annotations
 
+import logging
 import re
 from collections import Counter
 from dataclasses import dataclass
@@ -28,6 +29,8 @@ from pathlib import Path
 import pdfplumber
 
 from .config import CONFIG
+
+log = logging.getLogger(__name__)
 
 
 @dataclass
@@ -201,12 +204,23 @@ def extract_document(pdf_path: Path) -> list[Page]:
 
 
 def extract_corpus(data_dir: Path | None = None) -> list[Page]:
-    """Extract every PDF in the data directory. General: just globs *.pdf."""
+    """Extract every PDF in the data directory. General: just globs *.pdf.
+
+    A PDF that can't be read is logged and skipped so one bad file doesn't abort the
+    whole ingest; if NOTHING usable comes out, raise a clear error."""
     data_dir = data_dir or CONFIG.data_dir
     pdfs = sorted(data_dir.glob("*.pdf"))
     if not pdfs:
         raise FileNotFoundError(f"No PDFs found in {data_dir}")
     all_pages: list[Page] = []
     for pdf in pdfs:
-        all_pages.extend(extract_document(pdf))
+        try:
+            all_pages.extend(extract_document(pdf))
+        except Exception as e:  # noqa: BLE001 - any parser/OCR failure: skip this file
+            log.warning("Skipping %s: could not be read (%s: %s)", pdf.name, type(e).__name__, e)
+    if not all_pages:
+        raise RuntimeError(
+            f"No text could be extracted from any of the {len(pdfs)} PDF(s) in {data_dir}. "
+            "Check the files are valid, and that OCR dependencies are installed for scans."
+        )
     return all_pages
