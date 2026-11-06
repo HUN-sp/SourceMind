@@ -82,7 +82,7 @@ Legend: `[ ]` open, `[x]` fixed. Severity: **H**igh / **M**edium / **L**ow.
 - [x] **M5** `backend/app.py:85` — raw provider exception text is returned to the client
   (info leak) and every LLM failure is a 502, including rate limits that deserve a 429
   with a clear message.
-- [ ] **M6** `backend/requirements.txt` — `rapidocr-onnxruntime==1.4.4` cannot install on
+- [x] **M6** (partly — see note) `backend/requirements.txt` — `rapidocr-onnxruntime==1.4.4` cannot install on
   Python 3.13 (README says "3.10+"); pins are ~1 year old (fastapi 0.115.6, groq 0.13.1,
   sentence-transformers 3.3.1); `pytest`/`httpx` mixed into runtime deps.
 - [ ] **M7** Tests are not hermetic and thin: `backend/conftest.py:12` forces HF offline so
@@ -123,6 +123,7 @@ Legend: `[ ]` open, `[x]` fixed. Severity: **H**igh / **M**edium / **L**ow.
 - M3 fixed: oversized-block splitting uses `_split_by_tokens` (binary search; never emits an empty chunk; tokenizer calls drop from ~1 per word to O(pieces·log n)). `tests/test_chunk_edge_cases.py`.
 - M4 fixed: new `_OcrDocument` opens each scanned PDF once (lazily) and closes it in a `finally`; digital PDFs never import fitz/RapidOCR. `tests/test_ocr_session.py` (fake fitz + RapidOCR — real libs not run here).
 - M5 + L2 fixed: `generate.py` raises typed `LLMError` subclasses with curated messages (raw provider text only logged, API key scrubbed); `/ask` maps rate limit -> 429 (+`Retry-After`), missing key -> 503, others -> 502; `response_format` is omitted (not `None`) when `json_mode=False`. `tests/test_llm_errors.py` (uses real groq exception classes, no network).
+- M6 partly fixed: split dev deps into `requirements-dev.txt`; documented Python 3.10–3.12; bumped fastapi 0.115.6→0.162.0, uvicorn 0.34→0.54, pydantic 2.10→2.14.3, python-dotenv 1.0→1.2.4, groq 0.13→1.7.0 (full test-suite green on these versions). NOT bumped (cannot be verified here, see "Needs real testing"): pdfplumber, PyMuPDF, rapidocr-onnxruntime, sentence-transformers, rank-bm25.
 
 
 ## 6. Enhancements — Phase 3

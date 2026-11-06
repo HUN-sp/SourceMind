@@ -1,3 +1,6 @@
+# Python 3.10 - 3.12 required: rapidocr-onnxruntime has no wheels for 3.13+.
+# Dev/test tools (pytest, httpx) live in requirements-dev.txt.
+
 # --- PDF parsing ---
 pdfplumber==0.11.4          # layout-preserving text extraction (keeps table rows aligned)
 PyMuPDF==1.27.2.2           # fast page rasterization for the OCR fallback
@@ -14,14 +17,10 @@ sentence-transformers==3.3.1
 rank-bm25==0.2.2
 
 # --- backend API ---
-fastapi==0.115.6
-uvicorn[standard]==0.34.0
-pydantic==2.10.4
-python-dotenv==1.0.1
+fastapi==0.162.0
+uvicorn[standard]==0.54.0
+pydantic==2.14.3
+python-dotenv==1.2.4
 
 # --- LLM (Groq free tier, OpenAI-compatible) ---
-groq==0.13.1
-
-# --- tests ---
-pytest==8.3.4
-httpx==0.28.1
+groq==1.7.0

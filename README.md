@@ -49,14 +49,14 @@ reason similarity search is meaningful. Full rationale for every choice is in
 ## Setup from zero
 
 ### 0. Prerequisites
-- Python 3.10+ and Node 18+
+- Python **3.10–3.12** (RapidOCR has no wheels for 3.13+) and Node 18+
 - A free Groq API key — sign up at <https://console.groq.com/keys> (no card needed)
 
 ### 1. Backend
 ```bash
 cd backend
 python -m venv .venv && . .venv/Scripts/activate    # Windows; use .venv/bin/activate on macOS/Linux
-pip install -r requirements.txt
+pip install -r requirements.txt          # tests too: pip install -r requirements-dev.txt
 
 # configure secrets
 cp ../.env.example ../.env          # then edit ../.env and paste your GROQ_API_KEY
