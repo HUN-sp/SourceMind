@@ -9,13 +9,14 @@ Run (from backend/):
 """
 from __future__ import annotations
 
-from fastapi import FastAPI, HTTPException
+from fastapi import Depends, FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 
 from rag.config import CONFIG
 from rag.generate import LLMError
 from rag.pipeline import AskResult, ask
+from rag.ratelimit import SlidingWindowLimiter
 from rag.store import IndexNotBuiltError, collection_size
 
 app = FastAPI(title="SourceMind", version="1.0")
@@ -29,9 +30,29 @@ app.add_middleware(
 )
 
 
+# Per-client throttle for /ask (see rag/ratelimit.py). Module-level so tests can swap it.
+limiter = SlidingWindowLimiter(limit=CONFIG.rate_limit_per_minute, window_seconds=60)
+
+
+def _rate_limit(request: Request) -> None:
+    client_ip = request.client.host if request.client else "unknown"
+    allowed, retry_after = limiter.check(client_ip)
+    if not allowed:
+        raise HTTPException(
+            status_code=429,
+            detail=f"Too many requests. Please wait {retry_after}s and try again.",
+            headers={"Retry-After": str(retry_after)},
+        )
+
+
 class AskRequest(BaseModel):
-    question: str = Field(..., min_length=1, description="The user's question")
-    doc: str | None = Field(None, description="Optional: restrict to one document")
+    question: str = Field(
+        ..., min_length=1, max_length=CONFIG.max_question_chars,
+        description="The user's question",
+    )
+    doc: str | None = Field(
+        None, max_length=255, description="Optional: restrict to one document"
+    )
 
 
 class SourceOut(BaseModel):
@@ -76,7 +97,7 @@ def health() -> dict:
     }
 
 
-@app.post("/ask", response_model=AskResponse)
+@app.post("/ask", response_model=AskResponse, dependencies=[Depends(_rate_limit)])
 def ask_endpoint(req: AskRequest):
     try:
         result = ask(req.question, doc=req.doc)

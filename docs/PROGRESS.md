@@ -64,7 +64,7 @@ Legend: `[ ]` open, `[x]` fixed. Severity: **H**igh / **M**edium / **L**ow.
 - [x] **H5** `backend/rag/pipeline.py:126-133,176,185` — `parse_llm_json` accepts any JSON
   value; if the model returns a list/string, or `used_passages` is a non-list (e.g. `3`),
   `data.get` / iteration raises → HTTP 500 instead of the documented fail-safe refusal.
-- [ ] **H6** `backend/app.py:33` — no max length on `question` (unbounded text goes to the
+- [x] **H6** `backend/app.py:33` — no max length on `question` (unbounded text goes to the
   embedder and, via the prompt, to the paid LLM) and no rate limit on `/ask` (anyone who
   can reach the port can burn the Groq quota). Security / cost risk.
 
@@ -117,6 +117,7 @@ Legend: `[ ]` open, `[x]` fixed. Severity: **H**igh / **M**edium / **L**ow.
 - M7 (partial): added hermetic fixtures in `conftest.py` (fake tokenizer + hash embedder + synthetic `tiny_index`); real-model tests carry `@pytest.mark.real_index`. `tests/test_chunking.py` now passes without HuggingFace.
 - H4 fixed: missing index -> `/ask` returns 503 with a clear message (new `IndexNotBuiltError`), `/health` reports `index_missing`; tests in `tests/test_api.py`.
 - H5 fixed: `parse_llm_json` rejects non-object JSON; strict `not_covered` and `used_passages` handling (a `"false"` string used to cause a refusal; scalar/garbage `used_passages` used to 500). `tests/test_llm_parsing.py`.
+- H6 fixed: `MAX_QUESTION_CHARS` (default 1000, 422 above) and per-IP `RATE_LIMIT_PER_MINUTE` (default 30, 429 + Retry-After) on `/ask` via new `rag/ratelimit.py`; `tests/test_limits.py`. Limiter is in-memory, per process, keyed on the socket IP (behind a reverse proxy, rate-limit at the proxy).
 
 ## 6. Enhancements — Phase 3
 (chosen after Phase 2)

@@ -68,6 +68,11 @@ class Config:
     # (+ a numeric-density signal for figure questions). Lower k => sharper top.
     rerank_rrf_k: int = int(os.getenv("RERANK_RRF_K", "10"))
 
+    # API abuse limits (/ask spends paid LLM tokens)
+    max_question_chars: int = int(os.getenv("MAX_QUESTION_CHARS", "1000"))
+    # Requests per minute per client IP on /ask. 0 disables the limiter.
+    rate_limit_per_minute: int = int(os.getenv("RATE_LIMIT_PER_MINUTE", "30"))
+
     # Paths
     data_dir: Path = _path(os.getenv("DATA_DIR", "./data"))
     index_dir: Path = _path(os.getenv("INDEX_DIR", "./storage/index"))

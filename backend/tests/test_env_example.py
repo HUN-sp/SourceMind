@@ -19,6 +19,8 @@ TUNABLES = {
     "RERANK_CANDIDATES": "rerank_candidates",
     "LLM_MODEL": "llm_model",
     "EMBEDDING_MODEL": "embedding_model",
+    "MAX_QUESTION_CHARS": "max_question_chars",
+    "RATE_LIMIT_PER_MINUTE": "rate_limit_per_minute",
 }
 
 
