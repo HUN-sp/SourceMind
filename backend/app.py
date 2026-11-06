@@ -14,7 +14,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 
 from rag.config import CONFIG
-from rag.generate import LLMError
+from rag.generate import LLMConfigError, LLMError, LLMRateLimitError
 from rag.pipeline import AskResult, ask
 from rag.ratelimit import SlidingWindowLimiter
 from rag.store import IndexNotBuiltError, collection_size
@@ -108,7 +108,11 @@ def ask_endpoint(req: AskRequest):
             detail="The search index is missing or unreadable. Run `python ingest.py` "
                    "on the server, then try again.",
         )
-    except LLMError as e:
-        # The model is unreachable (bad key / rate limit). Tell the client clearly.
+    except LLMRateLimitError as e:
+        headers = {"Retry-After": str(e.retry_after)} if e.retry_after else None
+        raise HTTPException(status_code=429, detail=str(e), headers=headers)
+    except LLMConfigError as e:  # server not set up for LLM calls (no API key)
+        raise HTTPException(status_code=503, detail=str(e))
+    except LLMError as e:  # message is curated + safe; raw provider text is only logged
         raise HTTPException(status_code=502, detail=str(e))
     return _to_response(result)

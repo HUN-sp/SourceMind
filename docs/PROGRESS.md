@@ -79,7 +79,7 @@ Legend: `[ ]` open, `[x]` fixed. Severity: **H**igh / **M**edium / **L**ow.
   chunk; `chunk.py:146-154,121-125` re-tokenize the growing string on every word (O(n²)).
 - [x] **M4** `backend/rag/extract.py:102-109` — the PDF is re-opened for every OCR page and
   not closed if rasterisation/OCR raises (leaks handles; slow for big scans).
-- [ ] **M5** `backend/app.py:85` — raw provider exception text is returned to the client
+- [x] **M5** `backend/app.py:85` — raw provider exception text is returned to the client
   (info leak) and every LLM failure is a 502, including rate limits that deserve a 429
   with a clear message.
 - [ ] **M6** `backend/requirements.txt` — `rapidocr-onnxruntime==1.4.4` cannot install on
@@ -94,7 +94,7 @@ Legend: `[ ]` open, `[x]` fixed. Severity: **H**igh / **M**edium / **L**ow.
 ### Low
 - [ ] **L1** `backend/ingest.py:29` `__import__("pathlib")` hack; `backend/app.py:79`
   import inside the handler.
-- [ ] **L2** `backend/rag/generate.py:44` passes `response_format=None` when
+- [x] **L2** `backend/rag/generate.py:44` passes `response_format=None` when
   `json_mode=False` (SDK expects it omitted) — latent bug, parameter currently unused.
 - [ ] **L3** `backend/rag/config.py:30-62` — a malformed numeric env var (`TOP_K=abc`)
   crashes at import with an unhelpful `ValueError`.
@@ -122,6 +122,7 @@ Legend: `[ ]` open, `[x]` fixed. Severity: **H**igh / **M**edium / **L**ow.
 - M2 fixed: `extract_corpus` skips (and logs) unreadable PDFs and raises a clear `RuntimeError` if nothing is usable; `ingest.py` refactored into `run()` returning an exit code (no more `min([])` crash, no `__import__` hack -> also closes L1 ingest half). Tests: `test_extract_robustness.py`, `test_ingest_cli.py`.
 - M3 fixed: oversized-block splitting uses `_split_by_tokens` (binary search; never emits an empty chunk; tokenizer calls drop from ~1 per word to O(pieces·log n)). `tests/test_chunk_edge_cases.py`.
 - M4 fixed: new `_OcrDocument` opens each scanned PDF once (lazily) and closes it in a `finally`; digital PDFs never import fitz/RapidOCR. `tests/test_ocr_session.py` (fake fitz + RapidOCR — real libs not run here).
+- M5 + L2 fixed: `generate.py` raises typed `LLMError` subclasses with curated messages (raw provider text only logged, API key scrubbed); `/ask` maps rate limit -> 429 (+`Retry-After`), missing key -> 503, others -> 502; `response_format` is omitted (not `None`) when `json_mode=False`. `tests/test_llm_errors.py` (uses real groq exception classes, no network).
 
 
 ## 6. Enhancements — Phase 3
