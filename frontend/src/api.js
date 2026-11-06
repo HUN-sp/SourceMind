@@ -72,3 +72,18 @@ export async function askQuestion(question, { doc, timeoutMs = DEFAULT_TIMEOUT_M
     signal?.removeEventListener("abort", relayAbort);
   }
 }
+
+/**
+ * The indexed documents, for the "Search in" picker. Never throws: the picker is a
+ * convenience, so on any failure we return [] and the UI simply hides it.
+ */
+export async function listDocuments() {
+  try {
+    const res = await fetch("/api/documents");
+    if (!res.ok) return [];
+    const body = await res.json();
+    return Array.isArray(body?.documents) ? body.documents : [];
+  } catch {
+    return [];
+  }
+}

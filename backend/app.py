@@ -17,7 +17,7 @@ from rag.config import CONFIG
 from rag.generate import LLMConfigError, LLMError, LLMRateLimitError
 from rag.pipeline import AskResult, ask
 from rag.ratelimit import SlidingWindowLimiter
-from rag.store import IndexNotBuiltError, collection_size
+from rag.store import IndexNotBuiltError, collection_size, list_documents
 
 app = FastAPI(title="SourceMind", version="1.0")
 
@@ -99,8 +99,30 @@ def health() -> dict:
     }
 
 
+class DocumentOut(BaseModel):
+    doc: str
+    doc_label: str = ""
+    fiscal_period: str = ""
+    pages: int
+    chunks: int
+
+
+class DocumentsResponse(BaseModel):
+    documents: list[DocumentOut]
+
+
+@app.get("/documents", response_model=DocumentsResponse)
+def documents() -> DocumentsResponse:
+    """The indexed documents, so a client can offer a 'search only in…' picker."""
+    return DocumentsResponse(documents=[DocumentOut(**d) for d in list_documents()])
+
+
 @app.post("/ask", response_model=AskResponse, dependencies=[Depends(_rate_limit)])
 def ask_endpoint(req: AskRequest):
+    if req.doc is not None:
+        known = {d["doc"] for d in list_documents()}
+        if known and req.doc not in known:  # (an unbuilt index is reported below)
+            raise HTTPException(status_code=404, detail=f"Unknown document: {req.doc}")
     try:
         result = ask(req.question, doc=req.doc)
     except IndexNotBuiltError:

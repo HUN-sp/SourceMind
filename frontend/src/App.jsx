@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { askQuestion } from "./api.js";
+import { useEffect, useState } from "react";
+import { askQuestion, listDocuments } from "./api.js";
 import AnswerPanel from "./components/AnswerPanel.jsx";
 
 const EXAMPLES = [
@@ -13,6 +13,16 @@ export default function App() {
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState(null);
   const [error, setError] = useState(null);
+  const [documents, setDocuments] = useState([]);
+  const [doc, setDoc] = useState(""); // "" = search all documents
+
+  useEffect(() => {
+    let alive = true;
+    listDocuments().then((d) => alive && setDocuments(d));
+    return () => {
+      alive = false;
+    };
+  }, []);
 
   async function submit(q) {
     const text = (q ?? question).trim();
@@ -21,7 +31,7 @@ export default function App() {
     setError(null);
     setResult(null);
     try {
-      const data = await askQuestion(text);
+      const data = await askQuestion(text, { doc: doc || undefined });
       setResult(data);
     } catch (e) {
       setError(e.message || "Something went wrong.");
@@ -69,6 +79,20 @@ export default function App() {
           {loading ? "Searching…" : "Ask"}
         </button>
       </form>
+
+      {documents.length > 0 && (
+        <label className="doc-picker">
+          <span>Search in</span>
+          <select value={doc} onChange={(e) => setDoc(e.target.value)} disabled={loading}>
+            <option value="">All documents</option>
+            {documents.map((d) => (
+              <option key={d.doc} value={d.doc}>
+                {d.doc_label ? `${d.doc_label} (${d.doc})` : d.doc}
+              </option>
+            ))}
+          </select>
+        </label>
+      )}
 
       <div className="examples">
         <span className="examples-label">Try:</span>

@@ -375,6 +375,27 @@ def search(
     return out
 
 
+def list_documents() -> list[dict]:
+    """One summary row per indexed document (sorted by name): label, period, size.
+    Empty list if the index isn't built."""
+    try:
+        _, meta = _load()
+    except IndexNotBuiltError:
+        return []
+    docs: dict[str, dict] = {}
+    pages: dict[str, set[int]] = {}
+    for m in meta:
+        d = docs.setdefault(m["doc"], {
+            "doc": m["doc"], "doc_label": m.get("doc_label", ""),
+            "fiscal_period": m.get("fiscal_period", ""), "chunks": 0,
+        })
+        d["chunks"] += 1
+        pages.setdefault(m["doc"], set()).add(int(m["page"]))
+    for name, d in docs.items():
+        d["pages"] = len(pages[name])
+    return [docs[k] for k in sorted(docs)]
+
+
 def collection_size() -> int:
     try:
         return len(_load()[1])

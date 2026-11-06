@@ -79,3 +79,19 @@ describe("askQuestion", () => {
     expect(err.name).toBe("AbortError");
   });
 });
+
+import { listDocuments } from "./api.js";
+
+describe("listDocuments", () => {
+  it("returns the documents array", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(jsonResponse(200, { documents: [{ doc: "a.pdf" }] })));
+    expect(await listDocuments()).toEqual([{ doc: "a.pdf" }]);
+  });
+
+  it("returns [] on any failure (the picker is optional, never blocks asking)", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockRejectedValue(new TypeError("down")));
+    expect(await listDocuments()).toEqual([]);
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(jsonResponse(500, {})));
+    expect(await listDocuments()).toEqual([]);
+  });
+});

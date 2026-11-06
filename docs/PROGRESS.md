@@ -133,7 +133,7 @@ Legend: `[ ]` open, `[x]` fixed. Severity: **H**igh / **M**edium / **L**ow.
 
 Chosen for real users, in build order. `[x]` = built, tested and committed.
 
-- [ ] **E1 Document picker** — the API already accepts `doc`, but the UI can't use it; the
+- [x] **E1 Document picker** — the API already accepts `doc`, but the UI can't use it; the
   corpus is four filings of the same bank, so letting users scope a question to one filing
   prevents cross-period mix-ups. (`GET /documents`, 404 for unknown docs, dropdown in UI.)
 - [ ] **E2 Answer cache** — the Groq free tier caps ~100k tokens/day (README's #1 stated
@@ -150,6 +150,7 @@ Chosen for real users, in build order. `[x]` = built, tested and committed.
   and new config knobs.
 
 ### Enhancement log
+- E1 built: `GET /documents`, 404 for an unknown `doc` (before any LLM call), "Search in" picker in the UI. Tests: `backend/tests/test_documents.py`, `App.test.jsx`, `api.test.js`.
 
 ## 7. Needs real testing
 - Building the real index (`python ingest.py`) and anything depending on it:
