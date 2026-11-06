@@ -77,7 +77,7 @@ Legend: `[ ]` open, `[x]` fixed. Severity: **H**igh / **M**edium / **L**ow.
   aborts the whole ingest with a raw traceback.
 - [x] **M3** `backend/rag/chunk.py:150` — oversized-block splitter can append an empty
   chunk; `chunk.py:146-154,121-125` re-tokenize the growing string on every word (O(n²)).
-- [ ] **M4** `backend/rag/extract.py:102-109` — the PDF is re-opened for every OCR page and
+- [x] **M4** `backend/rag/extract.py:102-109` — the PDF is re-opened for every OCR page and
   not closed if rasterisation/OCR raises (leaks handles; slow for big scans).
 - [ ] **M5** `backend/app.py:85` — raw provider exception text is returned to the client
   (info leak) and every LLM failure is a 502, including rate limits that deserve a 429
@@ -121,6 +121,8 @@ Legend: `[ ]` open, `[x]` fixed. Severity: **H**igh / **M**edium / **L**ow.
 - M1 fixed: index written via temp files + `os.replace`; `_load()` validates embeddings/chunks agree (`IndexCorruptError` -> 503 with re-ingest hint); empty chunk list rejected. `tests/test_store_index.py`.
 - M2 fixed: `extract_corpus` skips (and logs) unreadable PDFs and raises a clear `RuntimeError` if nothing is usable; `ingest.py` refactored into `run()` returning an exit code (no more `min([])` crash, no `__import__` hack -> also closes L1 ingest half). Tests: `test_extract_robustness.py`, `test_ingest_cli.py`.
 - M3 fixed: oversized-block splitting uses `_split_by_tokens` (binary search; never emits an empty chunk; tokenizer calls drop from ~1 per word to O(pieces·log n)). `tests/test_chunk_edge_cases.py`.
+- M4 fixed: new `_OcrDocument` opens each scanned PDF once (lazily) and closes it in a `finally`; digital PDFs never import fitz/RapidOCR. `tests/test_ocr_session.py` (fake fitz + RapidOCR — real libs not run here).
+
 
 ## 6. Enhancements — Phase 3
 (chosen after Phase 2)

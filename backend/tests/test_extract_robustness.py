@@ -8,18 +8,21 @@ from rag.extract import extract_corpus
 TEXT = "Gross NPAs to Gross Advances 1.15 percent as at the reporting date for the bank"
 
 
-def _pdf_bytes(text: str) -> bytes:
+def _pdf_bytes(text: str, pages: int = 1) -> bytes:
     """Smallest valid one-page PDF with a real text layer (pdfminer tolerates the
     approximate xref)."""
     stream = f"BT /F1 12 Tf 20 100 Td ({text}) Tj ET".encode()
+    # objects: 1 catalog, 2 pages, 3 content stream, 4 font, 5.. the page objects
+    kids = " ".join(f"{5 + i} 0 R" for i in range(pages)).encode()
     objs = [
         b"<< /Type /Catalog /Pages 2 0 R >>",
-        b"<< /Type /Pages /Kids [3 0 R] /Count 1 >>",
-        b"<< /Type /Page /Parent 2 0 R /MediaBox [0 0 700 200] /Contents 4 0 R "
-        b"/Resources << /Font << /F1 5 0 R >> >> >>",
+        b"<< /Type /Pages /Kids [" + kids + b"] /Count " + str(pages).encode() + b" >>",
         b"<< /Length " + str(len(stream)).encode() + b" >>\nstream\n" + stream + b"\nendstream",
         b"<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>",
-    ]
+    ] + [
+        b"<< /Type /Page /Parent 2 0 R /MediaBox [0 0 700 200] /Contents 3 0 R "
+        b"/Resources << /Font << /F1 4 0 R >> >> >>"
+    ] * pages
     out, offsets = b"%PDF-1.4\n", []
     for i, o in enumerate(objs, 1):
         offsets.append(len(out))

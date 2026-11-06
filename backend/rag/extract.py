@@ -91,31 +91,44 @@ def _clean(text: str) -> str:
 _ocr_engine = None
 
 
-def _ocr_page(pdf_path: Path, page_index: int) -> str:
-    """Rasterize one page to an image and OCR it. Used only for pages with no
-    usable text layer (e.g. every page of data_4.pdf)."""
-    global _ocr_engine
-    import fitz  # PyMuPDF
-    import numpy as np
-    from rapidocr_onnxruntime import RapidOCR
+class _OcrDocument:
+    """OCR pages of ONE pdf. The PDF is opened lazily on the first page that needs
+    OCR (digital PDFs never touch fitz/RapidOCR) and reused for the rest, then
+    closed by `close()` — which extract_document calls in a `finally`."""
 
-    if _ocr_engine is None:
-        _ocr_engine = RapidOCR()
+    def __init__(self, pdf_path: Path) -> None:
+        self.pdf_path = pdf_path
+        self._doc = None
 
-    doc = fitz.open(pdf_path)
-    page = doc[page_index]
-    # Render at ~300 DPI (zoom 300/72) so OCR has enough resolution.
-    pix = page.get_pixmap(matrix=fitz.Matrix(300 / 72, 300 / 72))
-    img = np.frombuffer(pix.samples, dtype=np.uint8).reshape(pix.height, pix.width, pix.n)
-    if pix.n == 4:  # drop alpha
-        img = img[:, :, :3]
-    doc.close()
+    def page_text(self, page_index: int) -> str:
+        """Rasterize one page and OCR it. Used only for pages with no usable text
+        layer (e.g. every page of data_4.pdf)."""
+        global _ocr_engine
+        import fitz  # PyMuPDF
+        import numpy as np
+        from rapidocr_onnxruntime import RapidOCR
 
-    result, _ = _ocr_engine(img)
-    if not result:
-        return ""
-    # RapidOCR returns [ [box, text, score], ... ] in reading order.
-    return "\n".join(line[1] for line in result)
+        if _ocr_engine is None:
+            _ocr_engine = RapidOCR()
+        if self._doc is None:
+            self._doc = fitz.open(self.pdf_path)
+
+        # Render at ~300 DPI (zoom 300/72) so OCR has enough resolution.
+        pix = self._doc[page_index].get_pixmap(matrix=fitz.Matrix(300 / 72, 300 / 72))
+        img = np.frombuffer(pix.samples, dtype=np.uint8).reshape(pix.height, pix.width, pix.n)
+        if pix.n == 4:  # drop alpha
+            img = img[:, :, :3]
+
+        result, _ = _ocr_engine(img)
+        if not result:
+            return ""
+        # RapidOCR returns [ [box, text, score], ... ] in reading order.
+        return "\n".join(line[1] for line in result)
+
+    def close(self) -> None:
+        if self._doc is not None:
+            self._doc.close()
+            self._doc = None
 
 
 # --- Document metadata (statement type + reporting period) -----------------
@@ -183,21 +196,25 @@ def extract_document(pdf_path: Path) -> list[Page]:
     pages: list[Page] = []
     doc_name = pdf_path.name
 
-    with pdfplumber.open(pdf_path) as pdf:
-        for i, pl_page in enumerate(pdf.pages):
-            # layout=True preserves horizontal positions as spaces, which keeps
-            # financial table rows (the numbers) aligned under-ish their columns.
-            raw = pl_page.extract_text(layout=True) or ""
-            source = "text-layer"
+    ocr = _OcrDocument(pdf_path)
+    try:
+        with pdfplumber.open(pdf_path) as pdf:
+            for i, pl_page in enumerate(pdf.pages):
+                # layout=True preserves horizontal positions as spaces, which keeps
+                # financial table rows (the numbers) aligned under-ish their columns.
+                raw = pl_page.extract_text(layout=True) or ""
+                source = "text-layer"
 
-            if len(raw.strip()) < CONFIG.ocr_char_threshold:
-                # No usable text layer on this page -> OCR it.
-                raw = _ocr_page(pdf_path, i)
-                source = "ocr"
+                if len(raw.strip()) < CONFIG.ocr_char_threshold:
+                    # No usable text layer on this page -> OCR it.
+                    raw = ocr.page_text(i)
+                    source = "ocr"
 
-            cleaned = _clean(raw)
-            if cleaned:  # skip genuinely empty pages
-                pages.append(Page(doc=doc_name, page=i + 1, text=cleaned, source=source))
+                cleaned = _clean(raw)
+                if cleaned:  # skip genuinely empty pages
+                    pages.append(Page(doc=doc_name, page=i + 1, text=cleaned, source=source))
+    finally:
+        ocr.close()
 
     _assign_metadata(pages)
     return pages
