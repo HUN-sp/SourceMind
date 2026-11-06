@@ -158,8 +158,48 @@ Chosen for real users, in build order. `[x]` = built, tested and committed.
 - E1 built: `GET /documents`, 404 for an unknown `doc` (before any LLM call), "Search in" picker in the UI. Tests: `backend/tests/test_documents.py`, `App.test.jsx`, `api.test.js`.
 
 ## 7. Needs real testing
-- Building the real index (`python ingest.py`) and anything depending on it:
-  `tests/test_retrieval.py`, `tests/test_pipeline.py`, `retrieval_harness.py`, `query.py`
-  — needs `huggingface.co` access for `BAAI/bge-small-en-v1.5` (blocked in this sandbox).
-- Any real Groq call (`/ask` end-to-end, `run_batch.py`) — needs a real `GROQ_API_KEY`.
-- OCR of the scanned PDFs (`data_4.pdf`) via RapidOCR.
+
+Everything below could not be verified in this sandbox (no HuggingFace access, no real
+Groq key, no GPU/OCR models). Nothing here is claimed to work.
+
+- **Real index build + retrieval quality.** `python ingest.py` with the real
+  `BAAI/bge-small-en-v1.5` model, then `tests/test_retrieval.py`, `tests/test_pipeline.py`
+  (tagged `real_index`), `python query.py ...` and `python retrieval_harness.py`.
+  The harness file was only fixed to *compile*; its 10/17 recall figure is the
+  author's, not re-measured. `EVALUATION.md` numbers are likewise not re-run.
+- **Real LLM calls.** `/ask` end-to-end and `run_batch.py` need a real `GROQ_API_KEY`.
+  `groq` was bumped 0.13.1 → 1.7.0; the error classes were exercised via the SDK's real
+  exception types, but an actual completion call (`seed`, `response_format`) was not.
+- **OCR path with the real libraries.** `_OcrDocument` (open-once/close) is tested with fake
+  `fitz`/RapidOCR modules only; run `python ingest.py` on `data_4.pdf` to confirm.
+- **PDF/ML pins unchanged** (`pdfplumber`, `PyMuPDF`, `rapidocr-onnxruntime`,
+  `sentence-transformers`, `rank-bm25`) — still ~1 year old; bump them only alongside a
+  real ingest + harness run. The full `pip install -r requirements.txt` was not completed
+  here (torch download too slow); only the light CI subset was installed and tested.
+- **GitHub Actions workflow** (`.github/workflows/ci.yml`) is syntactically valid YAML and
+  its commands pass locally, but it has not run on GitHub yet.
+- **Rate limiter behind a reverse proxy** keys on the socket IP (all users share one key
+  behind a proxy) — rate-limit at the proxy in that setup.
+
+What *was* verified end-to-end here: the real FastAPI app + store + pipeline + Vite dev
+proxy + React UI driven by Playwright in Chromium, with a fake embedder and fake LLM on a
+synthetic two-document index (ask, scoped ask, cancel, copy, cache badge, refusal,
+backend-down banner, no JS console errors).
+
+## 8. Decisions made while working autonomously
+- **Branch:** the task named `claude/sourcemind-improvements` explicitly, so work was done
+  there (not on the session's default `claude/exciting-darwin-r8yf2s`). Never pushed to `main`.
+- **Hermetic tests over real-model tests:** unit tests use fake models by default; the two
+  real-index files keep working unchanged via the `real_index` marker.
+- **Only answered results are cached** (refusals can be transient LLM failures).
+- **Rate limit defaults** (30/min/IP) and **max question length** (1000 chars) are
+  conservative guesses — tune via `.env`.
+- **E4 scope changed** (period tags dropped as redundant with `doc_label`).
+- **L8** (garbage-line filter might drop short punctuation-heavy rows) and **L9**
+  (`Video_Link` file) deliberately left alone: both are documented author trade-offs /
+  cosmetic, and changing the filter would alter extraction output we can't re-verify here.
+- No features were removed.
+
+## 9. Final status
+- Backend: `pytest` → 149 passed, 7 skipped (the 7 are the `real_index` tests).
+- Frontend: `npm test` → 27 passed; `npm run build` OK.
