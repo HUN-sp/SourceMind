@@ -22,6 +22,16 @@ def _path(env_value: str) -> Path:
     return p if p.is_absolute() else (PROJECT_ROOT / p)
 
 
+def _env_num(name: str, default: str, cast):
+    """Read a numeric env var; a bad value raises ValueError naming the variable
+    (instead of a bare `invalid literal for int()` at import time)."""
+    raw = os.getenv(name, default)
+    try:
+        return cast(raw.strip())
+    except (ValueError, AttributeError):
+        raise ValueError(f"{name} must be a {cast.__name__}, got {raw!r} (check your .env)") from None
+
+
 @dataclass(frozen=True)
 class Config:
     # LLM
@@ -32,8 +42,8 @@ class Config:
     embedding_model: str = os.getenv("EMBEDDING_MODEL", "BAAI/bge-small-en-v1.5")
 
     # Retrieval
-    top_k: int = int(os.getenv("TOP_K", "8"))
-    min_similarity: float = float(os.getenv("MIN_SIMILARITY", "0.30"))
+    top_k: int = _env_num("TOP_K", "8", int)
+    min_similarity: float = _env_num("MIN_SIMILARITY", "0.30", float)
 
     # Hybrid retrieval (Phase 5 stretch): fuse a BM25 keyword ranking with the
     # vector ranking via Reciprocal Rank Fusion. Fixes the case where a terse
@@ -41,12 +51,12 @@ class Config:
     # boilerplate that merely echoes the question's date/entity words.
     use_hybrid: bool = os.getenv("USE_HYBRID", "true").strip().lower() in ("1", "true", "yes")
     # RRF dampening constant. Lower => more weight to each list's very top ranks.
-    rrf_k: int = int(os.getenv("RRF_K", "60"))
+    rrf_k: int = _env_num("RRF_K", "60", int)
     # When a question names NO period, gently prefer the most recent filing so a
     # generic "what was total income?" surfaces the latest quarter, not an older
     # one that happened to extract more cleanly. Bounded tiebreak (added to the
     # fused score); an explicit period in the question disables it. 0 = off.
-    recency_boost: float = float(os.getenv("RECENCY_BOOST", "0.01"))
+    recency_boost: float = _env_num("RECENCY_BOOST", "0.01", float)
 
     # Cross-encoder re-ranking: after hybrid retrieval gathers a candidate pool,
     # a small model re-reads each (question, chunk) pair JOINTLY and re-orders
@@ -60,18 +70,18 @@ class Config:
     use_reranker: bool = os.getenv("USE_RERANKER", "false").strip().lower() in ("1", "true", "yes")
     reranker_model: str = os.getenv("RERANKER_MODEL", "cross-encoder/ms-marco-MiniLM-L-6-v2")
     # Size of the first-stage candidate pool handed to the reranker.
-    rerank_candidates: int = int(os.getenv("RERANK_CANDIDATES", "25"))
+    rerank_candidates: int = _env_num("RERANK_CANDIDATES", "25", int)
     # We don't let the cross-encoder fully OVERRIDE first-stage ranking — left alone
     # it reorders by "reads like an answer", which buries terse numeric value rows
     # under fluent prose decoys (e.g. an OFS "net gain" note out-ranking the actual
     # "Net Profit for the period" row). Instead we RANK-FUSE first-stage + reranker
     # (+ a numeric-density signal for figure questions). Lower k => sharper top.
-    rerank_rrf_k: int = int(os.getenv("RERANK_RRF_K", "10"))
+    rerank_rrf_k: int = _env_num("RERANK_RRF_K", "10", int)
 
     # API abuse limits (/ask spends paid LLM tokens)
-    max_question_chars: int = int(os.getenv("MAX_QUESTION_CHARS", "1000"))
+    max_question_chars: int = _env_num("MAX_QUESTION_CHARS", "1000", int)
     # Requests per minute per client IP on /ask. 0 disables the limiter.
-    rate_limit_per_minute: int = int(os.getenv("RATE_LIMIT_PER_MINUTE", "30"))
+    rate_limit_per_minute: int = _env_num("RATE_LIMIT_PER_MINUTE", "30", int)
 
     # Paths
     data_dir: Path = _path(os.getenv("DATA_DIR", "./data"))

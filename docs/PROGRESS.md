@@ -92,11 +92,11 @@ Legend: `[ ]` open, `[x]` fixed. Severity: **H**igh / **M**edium / **L**ow.
   `_period_key`, recency, the `doc` filter's error path, or index persistence. No CI.
 
 ### Low
-- [ ] **L1** `backend/ingest.py:29` `__import__("pathlib")` hack; `backend/app.py:79`
+- [x] **L1** `backend/ingest.py:29` `__import__("pathlib")` hack; `backend/app.py:79`
   import inside the handler.
 - [x] **L2** `backend/rag/generate.py:44` passes `response_format=None` when
   `json_mode=False` (SDK expects it omitted) — latent bug, parameter currently unused.
-- [ ] **L3** `backend/rag/config.py:30-62` — a malformed numeric env var (`TOP_K=abc`)
+- [x] **L3** `backend/rag/config.py:30-62` — a malformed numeric env var (`TOP_K=abc`)
   crashes at import with an unhelpful `ValueError`.
 - [ ] **L4** `frontend/src/api.js:7` — no timeout/abort; a hung backend leaves the UI
   spinning forever.
@@ -125,6 +125,7 @@ Legend: `[ ]` open, `[x]` fixed. Severity: **H**igh / **M**edium / **L**ow.
 - M5 + L2 fixed: `generate.py` raises typed `LLMError` subclasses with curated messages (raw provider text only logged, API key scrubbed); `/ask` maps rate limit -> 429 (+`Retry-After`), missing key -> 503, others -> 502; `response_format` is omitted (not `None`) when `json_mode=False`. `tests/test_llm_errors.py` (uses real groq exception classes, no network).
 - M6 partly fixed: split dev deps into `requirements-dev.txt`; documented Python 3.10–3.12; bumped fastapi 0.115.6→0.162.0, uvicorn 0.34→0.54, pydantic 2.10→2.14.3, python-dotenv 1.0→1.2.4, groq 0.13→1.7.0 (full test-suite green on these versions). NOT bumped (cannot be verified here, see "Needs real testing"): pdfplumber, PyMuPDF, rapidocr-onnxruntime, sentence-transformers, rank-bm25.
 - M7 fixed: hermetic suite now covers retrieval helpers, hybrid fusion, recency tiebreak, doc filter, gate #1, prompt ordering (`tests/test_retrieval_unit.py`) plus all the tests above; 122 pass offline, 7 real-index tests skip.
+- L1 + L3 fixed: no more `__import__`/in-handler import; malformed numeric env vars raise `ValueError: TOP_K must be a int, got 'abc'` (`tests/test_config_env.py`).
 
 
 ## 6. Enhancements — Phase 3
