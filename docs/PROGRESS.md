@@ -136,7 +136,7 @@ Chosen for real users, in build order. `[x]` = built, tested and committed.
 - [x] **E1 Document picker** — the API already accepts `doc`, but the UI can't use it; the
   corpus is four filings of the same bank, so letting users scope a question to one filing
   prevents cross-period mix-ups. (`GET /documents`, 404 for unknown docs, dropdown in UI.)
-- [ ] **E2 Answer cache** — the Groq free tier caps ~100k tokens/day (README's #1 stated
+- [x] **E2 Answer cache** — the Groq free tier caps ~100k tokens/day (README's #1 stated
   limitation); repeated/example questions needlessly burn it. In-memory LRU keyed on
   (question, doc), cleared on re-index, `cached` flag in the response. (`CACHE_SIZE`.)
 - [ ] **E3 Readiness banner** — first-run failures (backend down, index not built, no API
@@ -150,6 +150,7 @@ Chosen for real users, in build order. `[x]` = built, tested and committed.
   and new config knobs.
 
 ### Enhancement log
+- E2 built: `rag/cache.py` LRU (`CACHE_SIZE`, default 128, 0 = off) in front of `/ask`; only answered results cached, keyed on normalised (question, doc) + index generation; `cached` flag in the response and cache stats in `/health`. `backend/tests/test_cache.py`.
 - E1 built: `GET /documents`, 404 for an unknown `doc` (before any LLM call), "Search in" picker in the UI. Tests: `backend/tests/test_documents.py`, `App.test.jsx`, `api.test.js`.
 
 ## 7. Needs real testing

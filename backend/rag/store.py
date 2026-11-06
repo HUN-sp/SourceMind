@@ -128,11 +128,19 @@ def _load() -> tuple[np.ndarray, list[dict]]:
     return _cache
 
 
+_generation = 0  # bumped on every reload so answer caches can tell the index changed
+
+
+def generation() -> int:
+    return _generation
+
+
 def reload_index() -> None:
     """Drop the in-memory caches (used after re-ingesting)."""
-    global _cache, _bm25_cache
+    global _cache, _bm25_cache, _generation
     _cache = None
     _bm25_cache = None
+    _generation += 1
 
 
 # --- BM25 keyword index (hybrid retrieval) ---------------------------------

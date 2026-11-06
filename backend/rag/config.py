@@ -83,6 +83,9 @@ class Config:
     # Requests per minute per client IP on /ask. 0 disables the limiter.
     rate_limit_per_minute: int = _env_num("RATE_LIMIT_PER_MINUTE", "30", int)
 
+    # Answer cache: how many answered questions to remember (0 disables).
+    cache_size: int = _env_num("CACHE_SIZE", "128", int)
+
     # Paths
     data_dir: Path = _path(os.getenv("DATA_DIR", "./data"))
     index_dir: Path = _path(os.getenv("INDEX_DIR", "./storage/index"))

@@ -21,6 +21,7 @@ TUNABLES = {
     "EMBEDDING_MODEL": "embedding_model",
     "MAX_QUESTION_CHARS": "max_question_chars",
     "RATE_LIMIT_PER_MINUTE": "rate_limit_per_minute",
+    "CACHE_SIZE": "cache_size",
 }
 
 

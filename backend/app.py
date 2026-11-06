@@ -13,6 +13,8 @@ from fastapi import Depends, FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 
+from rag import store
+from rag.cache import AnswerCache
 from rag.config import CONFIG
 from rag.generate import LLMConfigError, LLMError, LLMRateLimitError
 from rag.pipeline import AskResult, ask
@@ -45,6 +47,10 @@ def _rate_limit(request: Request) -> None:
         )
 
 
+# Remembers answered questions (see rag/cache.py). Module-level so tests can swap it.
+answer_cache = AnswerCache(CONFIG.cache_size)
+
+
 class AskRequest(BaseModel):
     question: str = Field(
         ..., min_length=1, max_length=CONFIG.max_question_chars,
@@ -69,6 +75,7 @@ class AskResponse(BaseModel):
     answer: str
     sources: list[SourceOut]
     refused: bool
+    cached: bool = False  # True when served from the answer cache (no LLM tokens spent)
 
 
 def _to_response(r: AskResult) -> AskResponse:
@@ -96,6 +103,7 @@ def health() -> dict:
         "indexed_chunks": chunks,
         "model": CONFIG.llm_model,
         "embedding_model": CONFIG.embedding_model,
+        "cache": answer_cache.stats(),
     }
 
 
@@ -123,6 +131,10 @@ def ask_endpoint(req: AskRequest):
         known = {d["doc"] for d in list_documents()}
         if known and req.doc not in known:  # (an unbuilt index is reported below)
             raise HTTPException(status_code=404, detail=f"Unknown document: {req.doc}")
+    key = AnswerCache.key(req.question, req.doc, store.generation())
+    hit = answer_cache.get(key)
+    if hit is not None:
+        return hit.model_copy(update={"cached": True})
     try:
         result = ask(req.question, doc=req.doc)
     except IndexNotBuiltError:
@@ -139,4 +151,7 @@ def ask_endpoint(req: AskRequest):
         raise HTTPException(status_code=503, detail=str(e))
     except LLMError as e:  # message is curated + safe; raw provider text is only logged
         raise HTTPException(status_code=502, detail=str(e))
-    return _to_response(result)
+    response = _to_response(result)
+    if not response.refused:  # never cache refusals: they may be a transient LLM hiccup
+        answer_cache.put(key, response)
+    return response
