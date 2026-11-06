@@ -42,6 +42,17 @@ class LLMRateLimitError(LLMError):
         super().__init__(message or ("The language model is rate-limited or its daily token quota is used up." + wait))
 
 
+class LLMModelError(LLMError):
+    """The configured model doesn't exist / isn't available to this key (providers
+    retire models). The fix is an operator change to LLM_MODEL, so name it."""
+
+    def __init__(self, model: str):
+        super().__init__(
+            f"The configured language model '{model}' is not available from the provider. "
+            "Set LLM_MODEL in .env to a model your key can use, then restart the server."
+        )
+
+
 class LLMUnavailableError(LLMError):
     """Provider unreachable, timed out, or returned a server error."""
 
@@ -88,6 +99,8 @@ def _translate(e: Exception) -> LLMError:
         return LLMRateLimitError(retry_after=retry)
     if isinstance(e, groq.AuthenticationError):
         return LLMAuthError()
+    if isinstance(e, groq.NotFoundError):
+        return LLMModelError(CONFIG.llm_model)
     if isinstance(e, (groq.APIConnectionError, groq.APITimeoutError, groq.InternalServerError)):
         return LLMUnavailableError()
     return LLMError("The language-model call failed. Please try again.")

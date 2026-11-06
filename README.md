@@ -40,7 +40,7 @@ reason similarity search is meaningful. Full rationale for every choice is in
 | Embeddings | `BAAI/bge-small-en-v1.5` (local, free, no key) |
 | Vector store | exact cosine over a NumPy matrix (no native deps) |
 | Keyword search | `rank-bm25`, fused with vectors via Reciprocal Rank Fusion |
-| LLM | Groq free tier (`llama-3.3-70b-versatile`), temperature 0, JSON mode |
+| LLM | Groq free tier (`openai/gpt-oss-120b`; override with `LLM_MODEL`), temperature 0, JSON mode |
 | Backend | FastAPI (`/health`, `/documents`, `/ask`) |
 | Frontend | React + Vite |
 

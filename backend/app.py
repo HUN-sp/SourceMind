@@ -16,7 +16,7 @@ from pydantic import BaseModel, Field
 from rag import store
 from rag.cache import AnswerCache
 from rag.config import CONFIG
-from rag.generate import LLMConfigError, LLMError, LLMRateLimitError, llm_configured
+from rag.generate import LLMConfigError, LLMError, LLMModelError, LLMRateLimitError, llm_configured
 from rag.pipeline import AskResult, ask
 from rag.ratelimit import SlidingWindowLimiter
 from rag.store import IndexNotBuiltError, collection_size, list_documents
@@ -159,7 +159,7 @@ def ask_endpoint(req: AskRequest):
     except LLMRateLimitError as e:
         headers = {"Retry-After": str(e.retry_after)} if e.retry_after else None
         raise HTTPException(status_code=429, detail=str(e), headers=headers)
-    except LLMConfigError as e:  # server not set up for LLM calls (no API key)
+    except (LLMConfigError, LLMModelError) as e:  # server not set up for LLM calls (no key / bad model)
         raise HTTPException(status_code=503, detail=str(e))
     except LLMError as e:  # message is curated + safe; raw provider text is only logged
         raise HTTPException(status_code=502, detail=str(e))

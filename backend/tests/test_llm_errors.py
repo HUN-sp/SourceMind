@@ -9,7 +9,7 @@ import app as app_module
 from app import app
 from rag import generate as gen
 from rag.generate import (
-    LLMAuthError, LLMConfigError, LLMError, LLMRateLimitError, LLMUnavailableError,
+    LLMAuthError, LLMConfigError, LLMError, LLMModelError, LLMRateLimitError, LLMUnavailableError,
 )
 
 client = TestClient(app)
@@ -36,6 +36,7 @@ def _client_raising(exc):
     (groq.InternalServerError(SECRET_DETAIL, response=_resp(500), body=None), LLMUnavailableError),
     (groq.APIConnectionError(request=httpx.Request("POST", "https://x")), LLMUnavailableError),
     (groq.APITimeoutError(request=httpx.Request("POST", "https://x")), LLMUnavailableError),
+    (groq.NotFoundError(SECRET_DETAIL, response=_resp(404), body=None), LLMModelError),
     (ValueError("weird " + SECRET_DETAIL), LLMError),
 ])
 def test_provider_errors_are_translated_and_scrubbed(monkeypatch, exc, expected):
@@ -68,6 +69,7 @@ def test_api_key_is_never_echoed(monkeypatch):
     (LLMRateLimitError(), 429),
     (LLMConfigError("GROQ_API_KEY is not set."), 503),
     (LLMAuthError(), 502),
+    (LLMModelError("m"), 503),
     (LLMUnavailableError(), 502),
     (LLMError("LLM call failed."), 502),
 ])
@@ -82,3 +84,14 @@ def test_endpoint_maps_llm_errors_to_status_codes(monkeypatch, tiny_index, exc, 
     assert resp.json()["detail"]
     if isinstance(exc, LLMRateLimitError) and exc.retry_after:
         assert resp.headers["retry-after"] == "42"
+
+
+def test_model_error_tells_the_operator_which_setting_to_change(monkeypatch):
+    cfg = type("C", (), {"groq_api_key": "k", "llm_model": "retired-model-x"})()
+    monkeypatch.setattr(gen, "CONFIG", cfg)
+    exc = groq.NotFoundError(SECRET_DETAIL, response=_resp(404), body=None)
+    monkeypatch.setattr(gen, "_client", lambda: _client_raising(exc))
+    with pytest.raises(LLMModelError) as ei:
+        gen.generate("s", "u")
+    assert "LLM_MODEL" in str(ei.value) and "retired-model-x" in str(ei.value)
+    assert "org_9f3" not in str(ei.value)

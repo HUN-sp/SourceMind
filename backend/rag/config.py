@@ -36,7 +36,7 @@ def _env_num(name: str, default: str, cast):
 class Config:
     # LLM
     groq_api_key: str = os.getenv("GROQ_API_KEY", "")
-    llm_model: str = os.getenv("LLM_MODEL", "llama-3.3-70b-versatile")
+    llm_model: str = os.getenv("LLM_MODEL", "openai/gpt-oss-120b")
 
     # Embeddings
     embedding_model: str = os.getenv("EMBEDDING_MODEL", "BAAI/bge-small-en-v1.5")
