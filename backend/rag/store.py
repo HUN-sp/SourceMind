@@ -39,6 +39,10 @@ from .chunk import Chunk
 from .config import CONFIG
 from .embed import embed_documents, embed_query
 
+class IndexNotBuiltError(FileNotFoundError):
+    """The search index doesn't exist yet (ingest hasn't been run)."""
+
+
 _EMB_FILE = "embeddings.npy"
 _META_FILE = "chunks.json"
 
@@ -84,7 +88,7 @@ def _load() -> tuple[np.ndarray, list[dict]]:
         emb_path = CONFIG.index_dir / _EMB_FILE
         meta_path = CONFIG.index_dir / _META_FILE
         if not emb_path.exists():
-            raise FileNotFoundError(
+            raise IndexNotBuiltError(
                 f"No index at {CONFIG.index_dir}. Run `python ingest.py` first."
             )
         emb = np.load(emb_path)

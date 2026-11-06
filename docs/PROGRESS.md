@@ -58,7 +58,7 @@ Legend: `[ ]` open, `[x]` fixed. Severity: **H**igh / **M**edium / **L**ow.
 - [x] **H3** `.env.example:38` — ships `USE_RERANKER=true`, whereas the code default and
   DECISIONS §6 say it must be off (it measurably hurts numeric value rows). Anyone who
   follows the README setup gets the worse behaviour.
-- [ ] **H4** `backend/rag/store.py:87` + `backend/app.py:81-86` — if the index isn't
+- [x] **H4** `backend/rag/store.py:87` + `backend/app.py:81-86` — if the index isn't
   built, `/ask` raises an unhandled `FileNotFoundError` → bare HTTP 500; `/health`
   (`app.py:69-74`) still reports `"status": "ok"`.
 - [ ] **H5** `backend/rag/pipeline.py:126-133,176,185` — `parse_llm_json` accepts any JSON
@@ -114,6 +114,8 @@ Legend: `[ ]` open, `[x]` fixed. Severity: **H**igh / **M**edium / **L**ow.
 - H1 fixed: removed pasted PowerShell transcript from `retrieval_harness.py`; added `tests/test_scripts_compile.py` (compiles every backend `.py`). Harness itself not run (needs the real index).
 - H2 fixed: `query.py` follows `CONFIG.use_reranker` unless `--rerank`/`--no-rerank` is given (`tests/test_query_cli.py`).
 - H3 fixed: `.env.example` now ships `USE_RERANKER=false`; `tests/test_env_example.py` keeps `.env.example` and code defaults in sync.
+- M7 (partial): added hermetic fixtures in `conftest.py` (fake tokenizer + hash embedder + synthetic `tiny_index`); real-model tests carry `@pytest.mark.real_index`. `tests/test_chunking.py` now passes without HuggingFace.
+- H4 fixed: missing index -> `/ask` returns 503 with a clear message (new `IndexNotBuiltError`), `/health` reports `index_missing`; tests in `tests/test_api.py`.
 
 ## 6. Enhancements — Phase 3
 (chosen after Phase 2)

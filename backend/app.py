@@ -9,14 +9,14 @@ Run (from backend/):
 """
 from __future__ import annotations
 
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 
 from rag.config import CONFIG
 from rag.generate import LLMError
 from rag.pipeline import AskResult, ask
-from rag.store import collection_size
+from rag.store import IndexNotBuiltError, collection_size
 
 app = FastAPI(title="SourceMind", version="1.0")
 
@@ -66,9 +66,11 @@ def _to_response(r: AskResult) -> AskResponse:
 
 @app.get("/health")
 def health() -> dict:
+    chunks = collection_size()
     return {
-        "status": "ok",
-        "indexed_chunks": collection_size(),
+        # "index_missing" tells operators/UI that /ask can't work yet.
+        "status": "ok" if chunks > 0 else "index_missing",
+        "indexed_chunks": chunks,
         "model": CONFIG.llm_model,
         "embedding_model": CONFIG.embedding_model,
     }
@@ -76,10 +78,15 @@ def health() -> dict:
 
 @app.post("/ask", response_model=AskResponse)
 def ask_endpoint(req: AskRequest):
-    from fastapi import HTTPException
-
     try:
         result = ask(req.question, doc=req.doc)
+    except IndexNotBuiltError:
+        # Fixed text on purpose: the exception message contains a server path.
+        raise HTTPException(
+            status_code=503,
+            detail="The search index hasn't been built yet. Run `python ingest.py` "
+                   "on the server, then try again.",
+        )
     except LLMError as e:
         # The model is unreachable (bad key / rate limit). Tell the client clearly.
         raise HTTPException(status_code=502, detail=str(e))
