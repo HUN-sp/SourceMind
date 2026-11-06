@@ -11,10 +11,10 @@ import pytest
 from rag.config import CONFIG
 from rag.pipeline import REFUSAL_MESSAGE, ask
 
-pytestmark = pytest.mark.skipif(
+pytestmark = [pytest.mark.real_index, pytest.mark.skipif(
     not (CONFIG.index_dir / "embeddings.npy").exists(),
     reason="index not built — run `python ingest.py` first",
-)
+)]
 
 ANSWERABLE = "What is the gross NPA ratio?"
 
