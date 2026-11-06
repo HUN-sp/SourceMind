@@ -58,6 +58,19 @@ class Config:
     # fused score); an explicit period in the question disables it. 0 = off.
     recency_boost: float = _env_num("RECENCY_BOOST", "0.01", float)
 
+    # Weight of the row-chunk rankings in rank fusion (page-level rankings weigh 1.0). Equal
+    # footing is the default: 0.7 was measured to push net-profit/consolidated rows out of the top-8.
+    row_weight: float = _env_num("ROW_WEIGHT", "1.0", float)
+
+    # Soft score bonus (RRF units; one list's rank-0 is ~0.0167) for chunks whose filing
+    # period / statement type is the one the question names. 0 = off.
+    period_boost: float = _env_num("PERIOD_BOOST", "0.02", float)
+
+    # Drop query terms that occur in more than this fraction of page-level chunks (and stopwords)
+    # before semantic/keyword ranking — see store.focus_query. false = use the raw question.
+    focus_query: bool = os.getenv("FOCUS_QUERY", "true").strip().lower() in ("1", "true", "yes")
+    common_term_ratio: float = _env_num("COMMON_TERM_RATIO", "0.5", float)
+
     # Cross-encoder re-ranking: after hybrid retrieval gathers a candidate pool,
     # a small model re-reads each (question, chunk) pair JOINTLY and re-orders
     # them, then we keep top_k. Catches the right numeric row when it lands just
@@ -93,6 +106,10 @@ class Config:
     # Chunking (see chunk.py for rationale)
     chunk_max_tokens: int = 350      # target chunk size, well under bge-small's 512 window
     chunk_overlap_tokens: int = 60   # overlap so a fact split across a boundary survives
+
+    # Also index each table row as its own small chunk (fixes dense-table retrieval;
+    # see chunk.py split_rows). Requires re-running ingest.py. false = page chunks only.
+    row_chunks: bool = os.getenv("ROW_CHUNKS", "true").strip().lower() in ("1", "true", "yes")
 
     # Ingestion: a page whose extracted text is shorter than this (chars) is
     # treated as "no usable text layer" and sent to the OCR fallback.

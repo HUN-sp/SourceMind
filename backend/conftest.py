@@ -103,8 +103,8 @@ def synthetic_pages():
             doc_label="Standalone Results — March 31, 2026",
             text=(
                 "Quarter ended Year ended\nParticulars 31.03.2026 31.03.2025\n"
-                "Gross NPAs to Gross Advances 1.15% 1.24%\n"
-                "Capital Adequacy Ratio 19.71% 19.55%"
+                "Gross NPAs to Gross Advances 1.15% 1.24% 1.33%\n"
+                "Capital Adequacy Ratio 19.71% 19.55% 19.40%"
             ),
         ),
         Page(
@@ -120,8 +120,8 @@ def synthetic_pages():
             doc_label="Consolidated Results — September 30, 2025",
             text=(
                 "Quarter ended Half year ended\nParticulars 30.09.2025 30.09.2024\n"
-                "Gross NPAs to Gross Advances 1.24% 1.36%\n"
-                "Net profit for the period 18641.28 16820.10"
+                "Gross NPAs to Gross Advances 1.24% 1.36% 1.40%\n"
+                "Net profit for the period 18641.28 16820.10 15000.00"
             ),
         ),
     ]

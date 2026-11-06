@@ -110,7 +110,7 @@ def build_context(chunks: list[Retrieved]) -> str:
     blocks = []
     for i, c in enumerate(chunks, 1):
         label = f" — {c.doc_label}" if c.doc_label else ""
-        if c.chunk_type == "table":
+        if c.chunk_type in ("table", "row"):
             kind = " [table: each row's numbers line up with the period columns shown at the top]"
         else:
             kind = ""

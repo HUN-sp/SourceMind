@@ -22,6 +22,11 @@ TUNABLES = {
     "MAX_QUESTION_CHARS": "max_question_chars",
     "RATE_LIMIT_PER_MINUTE": "rate_limit_per_minute",
     "CACHE_SIZE": "cache_size",
+    "ROW_CHUNKS": "row_chunks",
+    "ROW_WEIGHT": "row_weight",
+    "PERIOD_BOOST": "period_boost",
+    "FOCUS_QUERY": "focus_query",
+    "COMMON_TERM_RATIO": "common_term_ratio",
 }
 
 

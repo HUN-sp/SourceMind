@@ -36,7 +36,7 @@ class Chunk:
     statement_type: str = ""   # "standalone" | "consolidated" | ""
     fiscal_period: str = ""    # the period the filing covers, e.g. "March 31, 2026"
     doc_label: str = ""        # human-readable citation label
-    chunk_type: str = "prose"  # "table" if the page carries a period-dated table, else "prose"
+    chunk_type: str = "prose"  # "table" (page-level, dated table), "row" (one table row), or "prose"
     chunk_index: int = -1      # position of this chunk within its document (set in chunk_pages)
 
 
@@ -85,6 +85,81 @@ def _detect_period_header(text: str) -> str | None:
     if not header or (total_dates < 2 and not has_period):
         return None
     return " ".join(header)
+
+
+# --- Row-level chunks --------------------------------------------------------
+# Page-sized table chunks are dense blobs of OCR'd numbers: the "Net Profit" row and
+# the "Capital Adequacy Ratio" row share one ~1000-char chunk with ten other rows, so
+# its embedding is a blur and it ranked 57th-153rd of 224 for those questions (BM25
+# fared no better). We therefore ALSO index every table row on its own, with the
+# document label + column header attached — a small, focused target. The page-level
+# chunks stay: they give the LLM surrounding context.
+_NUM = re.compile(r"^[\(\[]?-?(\d[\d,]*(\.\d+)?%?|\d{1,2}[.\-/]\d{2}[.\-/]\d{4})[\)\]]?$")
+_DATE = re.compile(r"^\d{1,2}[.\-/]\d{2}[.\-/]\d{4}$")
+_ROW_NO = re.compile(r"^\d{1,2}$")                 # a bare row number like "13"
+_PLACEHOLDERS = frozenset({"nil", "nit", "iin", "-", "—", "–"})  # empty cells (incl. OCR variants)
+_MIN_VALUES = 3                                      # a value run needs >=3 numbers (tables have 3-5 columns)
+_LABEL_MAX_WORDS = 40                                # keep the words nearest the values
+
+
+def split_rows(text: str) -> list[str]:
+    """Split a page's text into table rows: `<label words> <run of >=3 numbers>`.
+
+    Works on the WHOLE page's flattened token stream, so it copes with how OCR
+    delivers tables — several rows glued onto one line, and rows cut in two by a
+    blank line. The header's date row (all dates) is dropped; a long preceding
+    label is trimmed to its last words."""
+    tokens = text.split()
+    n = len(tokens)
+    rows: list[str] = []
+    label: list[str] = []
+    i = 0
+    while i < n:
+        if not _NUM.match(tokens[i]):
+            # A run of >=3 empty-cell markers ("Nil Nit IIN IIN Nil") is a valueless row
+            # of its own; without this its label would be glued onto the NEXT row.
+            k = i
+            while k < n and tokens[k].lower() in _PLACEHOLDERS:
+                k += 1
+            if k - i >= _MIN_VALUES:
+                rows.append(" ".join(label[-_LABEL_MAX_WORDS:] + tokens[i:k]))
+                label = []
+                i = k
+                continue
+            label.append(tokens[i])
+            i += 1
+            continue
+        j = i
+        while j < n and (_NUM.match(tokens[j]) or (j > i and tokens[j].lower() in _PLACEHOLDERS)):
+            j += 1
+        run = tokens[i:j]
+        numeric = [t for t in run if _NUM.match(t)]
+        if len(numeric) < _MIN_VALUES:
+            label.extend(run)                       # e.g. a row number "12" or "(Refer note 18)"
+            i = j
+            continue
+        # A trailing bare integer followed by words is the NEXT row's number ("... 67347.36 13 Extraordinary...").
+        if j < n and len(run) > _MIN_VALUES and _ROW_NO.match(run[-1]):
+            j -= 1
+            run = run[:-1]
+            numeric = [t for t in run if _NUM.match(t)]
+        if not all(_DATE.match(t) for t in numeric):     # skip the column-header date row
+            rows.append(" ".join(label[-_LABEL_MAX_WORDS:] + run))
+        label = []
+        i = j
+    return rows
+
+
+def embedding_text(chunk: Chunk) -> str:
+    """The text we EMBED for a chunk. Page-level chunks: exactly their text. Row chunks:
+    only the row's label words — not the doc-label/header prefix (identical on every
+    chunk of a filing, so it swamps the embedding) and not the numbers (they carry no
+    semantics, only noise). The full text is still what's stored, shown and BM25-indexed."""
+    if chunk.chunk_type != "row":
+        return chunk.text
+    row = chunk.text.rsplit("\n", 1)[-1]
+    words = [t for t in row.split() if not _NUM.match(t) and t.lower() not in _PLACEHOLDERS]
+    return " ".join(words) or row
 
 
 @lru_cache(maxsize=1)
@@ -211,6 +286,30 @@ def chunk_page(page: Page) -> list[Chunk]:
                 chunk_type=chunk_type,
             )
         )
+
+    # Row-level chunks (see split_rows). Same provenance as the page; header re-attached
+    # so the numbers still line up with their period columns.
+    if CONFIG.row_chunks:
+        rows = split_rows(page.text)
+        if len(rows) >= 2:
+            for r_idx, row in enumerate(rows):
+                parts = [page.doc_label] if page.doc_label else []
+                if header:
+                    parts.append(header)
+                parts.append(row)
+                out.append(
+                    Chunk(
+                        id=f"{page.doc}::p{page.page}::r{r_idx}",
+                        doc=page.doc,
+                        page=page.page,
+                        text="\n".join(parts),
+                        source=page.source,
+                        statement_type=page.statement_type,
+                        fiscal_period=page.fiscal_period,
+                        doc_label=page.doc_label,
+                        chunk_type="row",
+                    )
+                )
     return out
 
 
