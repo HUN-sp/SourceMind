@@ -105,7 +105,7 @@ def ask_endpoint(req: AskRequest):
         # Fixed text on purpose: the exception message contains a server path.
         raise HTTPException(
             status_code=503,
-            detail="The search index hasn't been built yet. Run `python ingest.py` "
+            detail="The search index is missing or unreadable. Run `python ingest.py` "
                    "on the server, then try again.",
         )
     except LLMError as e:

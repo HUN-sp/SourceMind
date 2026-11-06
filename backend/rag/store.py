@@ -29,6 +29,7 @@ Persistence is just two files in INDEX_DIR:
 from __future__ import annotations
 
 import json
+import os
 import re
 from dataclasses import asdict, dataclass
 from functools import lru_cache
@@ -41,6 +42,11 @@ from .embed import embed_documents, embed_query
 
 class IndexNotBuiltError(FileNotFoundError):
     """The search index doesn't exist yet (ingest hasn't been run)."""
+
+
+class IndexCorruptError(IndexNotBuiltError):
+    """The index files exist but don't agree with each other (e.g. an interrupted
+    ingest). Treated like 'not built': the fix is to re-run ingest."""
 
 
 _EMB_FILE = "embeddings.npy"
@@ -64,6 +70,8 @@ class Retrieved:
 
 def index_chunks(chunks: list[Chunk], batch_size: int = 128) -> int:
     """(Re)build the index from scratch and persist it to INDEX_DIR."""
+    if not chunks:
+        raise ValueError("no chunks to index (did extraction find any text?)")
     CONFIG.index_dir.mkdir(parents=True, exist_ok=True)
 
     vectors: list[list[float]] = []
@@ -72,9 +80,21 @@ def index_chunks(chunks: list[Chunk], batch_size: int = 128) -> int:
         vectors.extend(embed_documents([c.text for c in batch]))
 
     emb = np.asarray(vectors, dtype=np.float32)
-    np.save(CONFIG.index_dir / _EMB_FILE, emb)
-    with open(CONFIG.index_dir / _META_FILE, "w", encoding="utf-8") as f:
-        json.dump([asdict(c) for c in chunks], f, ensure_ascii=False)
+    # Write to temp files, then rename into place, so a crash mid-write can never
+    # leave a half-written file where the live index was. (The two renames are not
+    # jointly atomic; _load() additionally verifies the pair agrees.)
+    emb_tmp = CONFIG.index_dir / (_EMB_FILE + ".tmp")
+    meta_tmp = CONFIG.index_dir / (_META_FILE + ".tmp")
+    try:
+        with open(emb_tmp, "wb") as f:
+            np.save(f, emb)
+        with open(meta_tmp, "w", encoding="utf-8") as f:
+            json.dump([asdict(c) for c in chunks], f, ensure_ascii=False)
+        os.replace(meta_tmp, CONFIG.index_dir / _META_FILE)
+        os.replace(emb_tmp, CONFIG.index_dir / _EMB_FILE)
+    finally:
+        for tmp in (emb_tmp, meta_tmp):
+            tmp.unlink(missing_ok=True)
     return len(chunks)
 
 
@@ -91,9 +111,19 @@ def _load() -> tuple[np.ndarray, list[dict]]:
             raise IndexNotBuiltError(
                 f"No index at {CONFIG.index_dir}. Run `python ingest.py` first."
             )
-        emb = np.load(emb_path)
-        with open(meta_path, encoding="utf-8") as f:
-            meta = json.load(f)
+        try:
+            emb = np.load(emb_path)
+            with open(meta_path, encoding="utf-8") as f:
+                meta = json.load(f)
+        except (OSError, ValueError) as e:  # missing chunks.json, truncated/invalid files
+            raise IndexCorruptError(
+                f"Index at {CONFIG.index_dir} is unreadable ({e}). Re-run `python ingest.py`."
+            ) from e
+        if emb.ndim != 2 or emb.shape[0] != len(meta):
+            raise IndexCorruptError(
+                f"Index at {CONFIG.index_dir} is inconsistent ({emb.shape[0] if emb.ndim else 0} "
+                f"embeddings vs {len(meta)} chunks). Re-run `python ingest.py`."
+            )
         _cache = (emb, meta)
     return _cache
 
@@ -348,5 +378,5 @@ def search(
 def collection_size() -> int:
     try:
         return len(_load()[1])
-    except FileNotFoundError:
+    except IndexNotBuiltError:  # not built, or corrupt
         return 0

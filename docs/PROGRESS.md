@@ -69,7 +69,7 @@ Legend: `[ ]` open, `[x]` fixed. Severity: **H**igh / **M**edium / **L**ow.
   can reach the port can burn the Groq quota). Security / cost risk.
 
 ### Medium
-- [ ] **M1** `backend/rag/store.py:71-73` — index written non-atomically (`.npy` then
+- [x] **M1** `backend/rag/store.py:71-73` — index written non-atomically (`.npy` then
   `.json`); an interrupted ingest leaves a mismatched pair that loads silently
   (`store.py:90-93` never checks `len(emb) == len(meta)`).
 - [ ] **M2** `backend/ingest.py:46` — `min(tok_counts)` raises `ValueError` when there are
@@ -118,6 +118,7 @@ Legend: `[ ]` open, `[x]` fixed. Severity: **H**igh / **M**edium / **L**ow.
 - H4 fixed: missing index -> `/ask` returns 503 with a clear message (new `IndexNotBuiltError`), `/health` reports `index_missing`; tests in `tests/test_api.py`.
 - H5 fixed: `parse_llm_json` rejects non-object JSON; strict `not_covered` and `used_passages` handling (a `"false"` string used to cause a refusal; scalar/garbage `used_passages` used to 500). `tests/test_llm_parsing.py`.
 - H6 fixed: `MAX_QUESTION_CHARS` (default 1000, 422 above) and per-IP `RATE_LIMIT_PER_MINUTE` (default 30, 429 + Retry-After) on `/ask` via new `rag/ratelimit.py`; `tests/test_limits.py`. Limiter is in-memory, per process, keyed on the socket IP (behind a reverse proxy, rate-limit at the proxy).
+- M1 fixed: index written via temp files + `os.replace`; `_load()` validates embeddings/chunks agree (`IndexCorruptError` -> 503 with re-ingest hint); empty chunk list rejected. `tests/test_store_index.py`.
 
 ## 6. Enhancements — Phase 3
 (chosen after Phase 2)
