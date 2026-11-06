@@ -157,34 +157,54 @@ Chosen for real users, in build order. `[x]` = built, tested and committed.
 - E2 built: `rag/cache.py` LRU (`CACHE_SIZE`, default 128, 0 = off) in front of `/ask`; only answered results cached, keyed on normalised (question, doc) + index generation; `cached` flag in the response and cache stats in `/health`. `backend/tests/test_cache.py`.
 - E1 built: `GET /documents`, 404 for an unknown `doc` (before any LLM call), "Search in" picker in the UI. Tests: `backend/tests/test_documents.py`, `App.test.jsx`, `api.test.js`.
 
-## 7. Needs real testing
+## 7. Real-environment testing (second pass, with network access + the owner's Groq key)
 
-Everything below could not be verified in this sandbox (no HuggingFace access, no real
-Groq key, no GPU/OCR models). Nothing here is claimed to work.
+The owner supplied a Groq key (stored only in the gitignored `.env`, never committed or
+printed) and approved a separate `sourcemind` environment allowing Hugging Face + Groq
+hosts. That let the previously blocked items be run for real:
 
-- **Real index build + retrieval quality.** `python ingest.py` with the real
-  `BAAI/bge-small-en-v1.5` model, then `tests/test_retrieval.py`, `tests/test_pipeline.py`
-  (tagged `real_index`), `python query.py ...` and `python retrieval_harness.py`.
-  The harness file was only fixed to *compile*; its 10/17 recall figure is the
-  author's, not re-measured. `EVALUATION.md` numbers are likewise not re-run.
-- **Real LLM calls.** `/ask` end-to-end and `run_batch.py` need a real `GROQ_API_KEY`.
-  `groq` was bumped 0.13.1 → 1.7.0; the error classes were exercised via the SDK's real
-  exception types, but an actual completion call (`seed`, `response_format`) was not.
-- **OCR path with the real libraries.** `_OcrDocument` (open-once/close) is tested with fake
-  `fitz`/RapidOCR modules only; run `python ingest.py` on `data_4.pdf` to confirm.
-- **PDF/ML pins unchanged** (`pdfplumber`, `PyMuPDF`, `rapidocr-onnxruntime`,
-  `sentence-transformers`, `rank-bm25`) — still ~1 year old; bump them only alongside a
-  real ingest + harness run. The full `pip install -r requirements.txt` was not completed
-  here (torch download too slow); only the light CI subset was installed and tested.
-- **GitHub Actions workflow** (`.github/workflows/ci.yml`) is syntactically valid YAML and
-  its commands pass locally, but it has not run on GitHub yet.
-- **Rate limiter behind a reverse proxy** keys on the socket IP (all users share one key
-  behind a proxy) — rate-limit at the proxy in that setup.
+**Now verified (really run):**
+- Full `pip install -r requirements-dev.txt` on Python 3.12 (incl. torch, RapidOCR, PyMuPDF).
+- `python ingest.py` with the real `bge-small-en-v1.5` + RapidOCR: 69 pages (46 text-layer,
+  23 OCR) -> **224 chunks** (max 438 tokens) — identical to what `DECISIONS.md` documents.
+  This also exercises the new `_OcrDocument` open-once/close path on the real scanned PDF.
+- `pytest` with the real index: **159 passed, 0 skipped** (the 7 `real_index` tests now run).
+- `retrieval_harness.py` (its first real run since the fix): **10/17**, the same recall the
+  author reported — fails: Q1, Q2, Q5, Q6, Q14, Q15, Q17 (see below).
+- Real `/ask` through FastAPI -> Groq, and the React UI in Chromium against the real backend
+  (answer, sources, cache badge, no console errors).
+- `groq` 1.7.0 SDK works for real completions (`seed`, JSON mode).
 
-What *was* verified end-to-end here: the real FastAPI app + store + pipeline + Vite dev
-proxy + React UI driven by Playwright in Chromium, with a fake embedder and fake LLM on a
-synthetic two-document index (ask, scoped ask, cancel, copy, cache badge, refusal,
-backend-down banner, no JS console errors).
+**New bug found only by the real run (fixed):** Groq has retired `llama-3.3-70b-versatile`
+(and `llama-3.1-8b-instant`) for this key -> every `/ask` failed with `model_not_found`,
+surfaced only as a generic error. Fixed: new `LLMModelError` (HTTP 503, tells the operator to
+set `LLM_MODEL`), default model changed to `openai/gpt-oss-120b` (the closest available
+model), `.env.example`/README updated, test added.
+
+**Live evaluation (`run_batch.py`, 15 questions, `openai/gpt-oss-120b`):** 10 answered/declined
+as expected, 5 wrongly declined (Q1 net profit, Q2 CAR, Q17 consolidated profit, Q14 profit
+trend, Q10 Retail segment assets). `run_batch.py` only checks answer-vs-decline, NOT
+correctness, and reading the answers shows two of the "PASS"es are wrong or weak:
+- **Q5 answered a wrong figure** ("Rs 3,512.96 crore"; the standalone FY2026 net profit is
+  74,671.29) — the documented dense-value-row weakness, producing a confident wrong answer.
+- Q12 said the Sep-30-2025 ratio "is not reported" (the original run found 1.24% -> 1.15%).
+All five failures + both weak answers trace to the retrieval weakness in `DECISIONS.md` §3/§9
+(the harness MISSes exactly these value rows), not to this branch's changes. Decline tests
+(Q18-Q20, "CEO of Microsoft") correctly refused. **`EVALUATION.md` was written with a
+different model and is NOT a record of this model's behaviour.**
+
+**Still not verified / for the owner:**
+- Real-world quality of `openai/gpt-oss-120b` vs the original Llama (prompt was tuned for
+  Llama; it sometimes writes "(see passage 7)" in answers). Consider A/B with
+  `openai/gpt-oss-20b`/`qwen/qwen3.8-27b` via `LLM_MODEL`.
+- Fixing the dense-value-row retrieval problem (the biggest quality issue): finer chunking of
+  the P&L / ratios blocks, then re-run `retrieval_harness.py` (target > 10/17).
+- PDF/ML pins (`pdfplumber`, `PyMuPDF`, `rapidocr-onnxruntime`, `sentence-transformers`,
+  `rank-bm25`) were left at their original versions on purpose (they ran fine as pinned).
+- GitHub Actions workflow has not run on GitHub yet (commands pass locally).
+- Rate limiter keys on the socket IP (behind a reverse proxy, limit at the proxy).
+- **Security housekeeping:** the Groq key was pasted into the chat; rotate it at
+  console.groq.com/keys if that matters to you.
 
 ## 8. Decisions made while working autonomously
 - **Branch:** the task named `claude/sourcemind-improvements` explicitly, so work was done
@@ -201,5 +221,5 @@ backend-down banner, no JS console errors).
 - No features were removed.
 
 ## 9. Final status
-- Backend: `pytest` → 149 passed, 7 skipped (the 7 are the `real_index` tests).
+- Backend: `pytest` → 159 passed (with the real index built); offline/CI-style run → 152 passed, 7 `real_index` skipped.
 - Frontend: `npm test` → 27 passed; `npm run build` OK.

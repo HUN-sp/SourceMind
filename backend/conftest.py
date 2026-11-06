@@ -42,6 +42,19 @@ def pytest_configure(config):
     )
 
 
+def pytest_collection_modifyitems(config, items):
+    """`real_index` tests need the real embedding stack too, not just an index on
+    disk (e.g. a light CI-style install has an index but no sentence-transformers)."""
+    import importlib.util
+
+    if importlib.util.find_spec("sentence_transformers") is not None:
+        return
+    skip = pytest.mark.skip(reason="sentence-transformers not installed (light install)")
+    for item in items:
+        if item.get_closest_marker("real_index"):
+            item.add_marker(skip)
+
+
 class FakeTokenizer:
     """Whitespace tokenizer exposing the one method rag.chunk uses."""
 

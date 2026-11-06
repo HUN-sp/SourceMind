@@ -7,6 +7,10 @@ wrong. Results are from live end-to-end runs against the backend (Groq
 system should decline) and paraphrased questions (worded differently from the
 documents).
 
+> **Note:** the results below were produced with `llama-3.3-70b-versatile`, which Groq has
+> since retired. A re-run with `openai/gpt-oss-120b` is summarised in
+> [`docs/PROGRESS.md`](docs/PROGRESS.md) §7 (same retrieval weaknesses, incl. a wrong net-profit answer).
+
 > Where retrieval is fragile, results can vary slightly between runs (LLM
 > non-determinism + borderline ranking). We note those cases honestly rather than
 > cherry-picking a good run.
