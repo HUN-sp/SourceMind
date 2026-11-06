@@ -142,14 +142,16 @@ Chosen for real users, in build order. `[x]` = built, tested and committed.
 - [x] **E3 Readiness banner** — first-run failures (backend down, index not built, no API
   key) currently surface as confusing errors after the first question. `/health` now says
   what's wrong and the UI shows a setup banner up front.
-- [ ] **E4 Cancel + copy + period tags** — LLM calls take seconds: add a Cancel button
-  (uses the new AbortSignal support), a Copy-answer button, and show each source's
-  statement type / period so users can verify the right filing was used.
+- [x] **E4 Cancel + copy + cached badge** — LLM calls take seconds: Cancel button (uses the
+  AbortSignal support), a Copy-answer button (answer + citations), and an "Instant answer"
+  badge for cache hits. (Scope changed from "period tags": a source card's title already
+  carries statement type + period via `doc_label`, so that would have been redundant.)
 - [ ] **E5 CI + docs refresh** — GitHub Actions running the offline backend tests and the
   frontend tests/build on every push/PR; README gets the API reference, test instructions
   and new config knobs.
 
 ### Enhancement log
+- E4 built: Cancel button during a request (no error shown on cancel), Copy-answer button (`formatForCopy`), "Instant answer" badge; `AnswerPanel.test.jsx` + cancel test in `App.test.jsx`.
 - E3 built: `/health` now returns `ready`, `problems[]`, `llm_configured` (never the key); UI shows a "Setup needed" banner (backend unreachable / index missing / no API key); bare 5xx from the dev proxy now says to check the backend. Tests in `test_api.py`, `App.test.jsx`, `api.test.js`.
 - E2 built: `rag/cache.py` LRU (`CACHE_SIZE`, default 128, 0 = off) in front of `/ask`; only answered results cached, keyed on normalised (question, doc) + index generation; `cached` flag in the response and cache stats in `/health`. `backend/tests/test_cache.py`.
 - E1 built: `GET /documents`, 404 for an unknown `doc` (before any LLM call), "Search in" picker in the UI. Tests: `backend/tests/test_documents.py`, `App.test.jsx`, `api.test.js`.

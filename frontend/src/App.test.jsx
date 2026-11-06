@@ -86,4 +86,20 @@ describe("App", () => {
     render(<App />);
     expect(await screen.findByTestId("setup-banner")).toHaveTextContent(/uvicorn/);
   });
+
+  it("lets the user cancel a slow request without showing an error", async () => {
+    vi.spyOn(api, "askQuestion").mockImplementation(
+      (q, { signal }) =>
+        new Promise((_, reject) => {
+          signal.addEventListener("abort", () => reject(new DOMException("aborted", "AbortError")));
+        })
+    );
+    render(<App />);
+    fireEvent.change(screen.getByPlaceholderText(/ask a question/i), { target: { value: "slow?" } });
+    fireEvent.click(screen.getByRole("button", { name: "Ask" }));
+    fireEvent.click(await screen.findByRole("button", { name: /cancel/i }));
+    await waitFor(() => expect(screen.getByRole("button", { name: "Ask" })).toBeInTheDocument());
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+    expect(screen.queryByText(/retrieving passages/i)).not.toBeInTheDocument();
+  });
 });

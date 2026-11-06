@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { askQuestion, getHealth, listDocuments } from "./api.js";
 import AnswerPanel from "./components/AnswerPanel.jsx";
 
@@ -16,6 +16,10 @@ export default function App() {
   const [documents, setDocuments] = useState([]);
   const [doc, setDoc] = useState(""); // "" = search all documents
   const [setupProblems, setSetupProblems] = useState([]);
+  const abortRef = useRef(null); // AbortController of the in-flight request
+
+  // Don't leave a request running if the component goes away.
+  useEffect(() => () => abortRef.current?.abort(), []);
 
   // On load, ask the backend whether it is actually ready to answer, so setup
   // problems are explained up front instead of after the first failed question.
@@ -47,17 +51,25 @@ export default function App() {
   async function submit(q) {
     const text = (q ?? question).trim();
     if (!text || loading) return;
+    const ctrl = new AbortController();
+    abortRef.current = ctrl;
     setLoading(true);
     setError(null);
     setResult(null);
     try {
-      const data = await askQuestion(text, { doc: doc || undefined });
+      const data = await askQuestion(text, { doc: doc || undefined, signal: ctrl.signal });
       setResult(data);
     } catch (e) {
+      if (e?.name === "AbortError") return; // user pressed Cancel: not an error
       setError(e.message || "Something went wrong.");
     } finally {
+      if (abortRef.current === ctrl) abortRef.current = null;
       setLoading(false);
     }
+  }
+
+  function cancel() {
+    abortRef.current?.abort();
   }
 
   function onSubmit(e) {
@@ -109,6 +121,11 @@ export default function App() {
         <button className="ask-button" type="submit" disabled={loading || !question.trim()}>
           {loading ? "Searching…" : "Ask"}
         </button>
+        {loading && (
+          <button className="cancel-button" type="button" onClick={cancel}>
+            Cancel
+          </button>
+        )}
       </form>
 
       {documents.length > 0 && (
