@@ -1,12 +1,35 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import App from "./App.jsx";
 import * as api from "./api.js";
 
 beforeEach(() => {
   vi.spyOn(api, "listDocuments").mockResolvedValue([]);
   vi.spyOn(api, "getHealth").mockResolvedValue({ ready: true, problems: [] });
+  vi.spyOn(api, "getDemo").mockResolvedValue(null);
 });
+
+const DEMO = {
+  presets: [
+    { id: "numeric", kind: "Answerable · exact figure", label: "Gross NPA ratio", question: "What was the Gross NPA ratio?", shows: "An exact figure." },
+    { id: "multihop", kind: "Multi-hop", label: "NPA trend", question: "How did it change?", shows: "Two filings." },
+    { id: "trap", kind: "Unanswerable · trap", label: "Crypto?", question: "How much crypto?", shows: "Abstention." },
+  ],
+  evals: {
+    eval10: { title: "10-question evaluation", note: "n", rows: [{ label: "Correct", value: 6 }], takeaway: "t" },
+    ablation: { title: "Reranker A/B", note: "n", rows: [{ label: "+ reranker", value: "15/17" }], rank_shifts: [], takeaway: "Ships disabled." },
+  },
+};
+
+const SCORED = {
+  answer: "It was 1.15%.", refused: false, cached: true, preset: "numeric", latency_ms: 3,
+  top_similarity: 0.82, min_similarity: 0.3,
+  sources: [{ doc: "data_4.pdf", page: 1, snippet: "Gross NPAs 1.15%", similarity: 0.82 }],
+  retrieval: [
+    { doc: "data_4.pdf", page: 1, chunk_type: "row", snippet: "Gross NPAs 1.15%", cosine: 0.822, vec_rank: 1, bm25: 26.77, bm25_rank: 2, rrf: 0.0533, cited: true },
+    { doc: "data_4.pdf", page: 11, chunk_type: "table", snippet: "other", cosine: 0.719, vec_rank: 9, bm25: 6.52, bm25_rank: 40, rrf: 0.049, cited: false },
+  ],
+};
 afterEach(() => vi.restoreAllMocks());
 
 const DOCS = [
@@ -101,5 +124,41 @@ describe("App", () => {
     await waitFor(() => expect(screen.getByRole("button", { name: "Ask" })).toBeInTheDocument());
     expect(screen.queryByRole("alert")).not.toBeInTheDocument();
     expect(screen.queryByText(/retrieving passages/i)).not.toBeInTheDocument();
+  });
+
+  it("renders the demo chips above the input and runs a preset over all documents", async () => {
+    api.getDemo.mockResolvedValue(DEMO);
+    vi.spyOn(api, "listDocuments").mockResolvedValue(DOCS);
+    const ask = vi.spyOn(api, "askQuestion").mockResolvedValue(SCORED);
+    render(<App />);
+    const chips = await screen.findByTestId("demo-chips");
+    const input = screen.getByPlaceholderText(/ask a question/i);
+    // chips come before the input in document order
+    expect(chips.compareDocumentPosition(input) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    fireEvent.change(await screen.findByLabelText(/search in/i), { target: { value: "data_4.pdf" } });
+    fireEvent.click(screen.getByRole("button", { name: /crypto/i }));
+    await waitFor(() => expect(ask).toHaveBeenCalled());
+    expect(ask.mock.calls[0][0]).toBe("How much crypto?");
+    expect(ask.mock.calls[0][1].doc).toBeUndefined();
+    expect(await screen.findByText(/what this shows: abstention/i)).toBeInTheDocument();
+  });
+
+  it("shows retrieval scores and the eval summary in the inspector", async () => {
+    api.getDemo.mockResolvedValue(DEMO);
+    vi.spyOn(api, "askQuestion").mockResolvedValue(SCORED);
+    render(<App />);
+    const chips = await screen.findByTestId("demo-chips");
+    fireEvent.click(within(chips).getByRole("button", { name: /gross npa ratio/i }));
+    await screen.findByText("It was 1.15%.");
+    expect(screen.getByTestId("response-meta")).toHaveTextContent(/pre-computed/);
+    fireEvent.click(screen.getByRole("button", { name: /retrieval & evals/i }));
+    const list = screen.getByTestId("retrieval-list");
+    expect(list).toHaveTextContent("0.822");
+    expect(list).toHaveTextContent("26.77");
+    expect(list).toHaveTextContent("0.0533");
+    expect(list).toHaveTextContent(/cited/);
+    fireEvent.click(screen.getByRole("tab", { name: /evals/i }));
+    expect(screen.getByText(/ships disabled/i)).toBeInTheDocument();
+    expect(screen.getByText("15/17")).toBeInTheDocument();
   });
 });

@@ -41,7 +41,7 @@ def test_ask_with_known_document_passes_it_through(tiny_index, monkeypatch):
     monkeypatch.setattr(app_module, "limiter", app_module.SlidingWindowLimiter(limit=0))
     seen = {}
 
-    def fake_ask(q, doc=None):
+    def fake_ask(q, doc=None, **_):
         seen["doc"] = doc
         from rag.pipeline import AskResult
         return AskResult(answer="a", sources=[], refused=False, retrieved=[], top_similarity=1.0)

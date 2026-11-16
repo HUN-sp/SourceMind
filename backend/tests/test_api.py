@@ -45,7 +45,7 @@ def test_ask_happy_path_returns_answer_and_sources(tiny_index, monkeypatch):
     from rag import pipeline
 
     fake = _fake_llm({"not_covered": False, "answer": "1.15%", "used_passages": [1]})
-    monkeypatch.setattr(app_module, "ask", lambda q, doc=None: pipeline.ask(q, doc=doc, generate=fake))
+    monkeypatch.setattr(app_module, "ask", lambda q, doc=None, **_: pipeline.ask(q, doc=doc, generate=fake))
     resp = client.post("/ask", json={"question": "What is the gross NPA ratio to gross advances?"})
     assert resp.status_code == 200
     body = resp.json()

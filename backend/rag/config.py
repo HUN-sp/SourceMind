@@ -95,6 +95,10 @@ class Config:
     max_question_chars: int = _env_num("MAX_QUESTION_CHARS", "1000", int)
     # Requests per minute per client IP on /ask. 0 disables the limiter.
     rate_limit_per_minute: int = _env_num("RATE_LIMIT_PER_MINUTE", "30", int)
+    # Quota protection for LIVE LLM calls only (cached/preset answers are free), in
+    # `limits` notation ("15/hour", "800/day"). Empty string disables a bucket.
+    llm_limit_per_ip: str = os.getenv("LLM_LIMIT_PER_IP", "15/hour").strip()
+    llm_limit_global: str = os.getenv("LLM_LIMIT_GLOBAL", "800/day").strip()
 
     # Answer cache: how many answered questions to remember (0 disables).
     cache_size: int = _env_num("CACHE_SIZE", "128", int)

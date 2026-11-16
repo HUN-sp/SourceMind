@@ -1,0 +1,31 @@
+# Caddy: automatic HTTPS (Let's Encrypt) for the sslip.io hostname, serves the React
+# build, and proxies /api/* (prefix stripped) to FastAPI on localhost:8000.
+# DOMAIN is set in /etc/default/caddy, e.g. DOMAIN=13-200-1-2.sslip.io
+{$DOMAIN} {
+	encode zstd gzip
+
+	handle_path /api/* {
+		# Caddy ignores X-Forwarded-For from clients and sets it to the real peer IP,
+		# which uvicorn (--proxy-headers) uses as the client IP for rate limiting.
+		reverse_proxy 127.0.0.1:8000
+	}
+
+	handle {
+		root * /opt/sourcemind/frontend/dist
+		try_files {path} /index.html
+		file_server
+		@assets path /assets/*
+		header @assets Cache-Control "public, max-age=31536000, immutable"
+	}
+
+	header {
+		Strict-Transport-Security "max-age=31536000"
+		X-Content-Type-Options "nosniff"
+		Referrer-Policy "strict-origin-when-cross-origin"
+		X-Frame-Options "DENY"
+		-Server
+	}
+	log {
+		output file /var/log/caddy/access.log
+	}
+}

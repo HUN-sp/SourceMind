@@ -1,0 +1,375 @@
+{
+ "index_sha256": "259c7adb4ab359f6c3104dc079dd44b168b01fffb4cc4c2b3d751cc3668a1338",
+ "indexed_chunks": 949,
+ "built_at": "2026-11-16T08:05:13Z",
+ "responses": {
+  "numeric": {
+   "answer": "The Gross NPA ratio was 1.15% for the year ended March 31 2026.",
+   "sources": [
+    {
+     "doc": "data_4.pdf",
+     "page": 1,
+     "snippet": "Standalone Results — March 31, 2026\n(c)% of Gross NPAs to Gross Advances | Quarter ended March 31, 2026: 1.15% | Quarter ended December 31, 2025: 1.24% | Quarter ended March 31, 2025: 1.33% | Year ended March 31, 2026: 1.15% | Year ended March 31, 2025: 1.33%",
+     "similarity": 0.822,
+     "doc_label": "Standalone Results — March 31, 2026",
+     "statement_type": "standalone",
+     "fiscal_period": "March 31, 2026"
+    }
+   ],
+   "refused": false,
+   "retrieval": [
+    {
+     "doc": "data_4.pdf",
+     "page": 1,
+     "doc_label": "Standalone Results — March 31, 2026",
+     "chunk_type": "row",
+     "snippet": "Standalone Results — March 31, 2026\n(c)% of Gross NPAs to Gross Advances | Quarter ended March 31, 2026: 1.15% | Quarter ended December 31, 2025: 1.24% | Quarter ended March 31, 2025: 1.33% | Year ended March 31, 2026: 1.15% | Year ended March 31, 2025: 1.33%",
+     "cosine": 0.8221,
+     "vec_rank": 1,
+     "bm25": 26.771,
+     "bm25_rank": 3,
+     "rrf": 0.05333,
+     "cited": true
+    },
+    {
+     "doc": "data_4.pdf",
+     "page": 1,
+     "doc_label": "Standalone Results — March 31, 2026",
+     "chunk_type": "row",
+     "snippet": "Standalone Results — March 31, 2026\nexpense)-not annualized (iv) NPA Ratios: (a) Gross NPAs | Quarter ended March 31, 2026: 34061.19 | Quarter ended December 31, 2025: 35178.98 | Quarter ended March 31, 2025: 35222.64 | Year ended March 31, 2026: 34061.19 | Year ended March 31, 2025: 35222.64",
+     "cosine": 0.7103,
+     "vec_rank": 25,
+     "bm25": 23.489,
+     "bm25_rank": 7,
+     "rrf": 0.05058,
+     "cited": false
+    },
+    {
+     "doc": "data_4.pdf",
+     "page": 1,
+     "doc_label": "Standalone Results — March 31, 2026",
+     "chunk_type": "row",
+     "snippet": "Standalone Results — March 31, 2026\n(d)%of Net NPAs to Net Advances | Quarter ended March 31, 2026: 0.38% | Quarter ended December 31, 2025: 0.42% | Quarter ended March 31, 2025: 0.43% | Year ended March 31, 2026: 0.38% | Year ended March 31, 2025: 0.43%",
+     "cosine": 0.7475,
+     "vec_rank": 6,
+     "bm25": 8.21,
+     "bm25_rank": 19,
+     "rrf": 0.05009,
+     "cited": false
+    },
+    {
+     "doc": "data_4.pdf",
+     "page": 1,
+     "doc_label": "Standalone Results — March 31, 2026",
+     "chunk_type": "table",
+     "snippet": "Standalone Results — March 31, 2026\nQuarterended Yearended 31.03.2026 31.12.2026 31.03.2025 31.03.2026 31.03.2026\nNPA Ratios: (a) Gross NPAs 34061.19 35178.98 35222.64 34061.19 35222.64 （b)Net NPAs 11169.54 11981.75 11320.43 11169.54 11320.43 (c)% of Gross NPAs to Gross Advances 1.15% 1.24% 1.33% 1.15% 1.33% (d)%of Net NPAs to Net Advances 0.38% 0.42% 0.43% 0.38% 0.43% (v)Relurn on assels(average)-notannualized 0.48% 0.48% 0.48% 1.94% 1.91% （vi)Net worth 546325.46 526944,57 488899.89 546325.46 488899.89 (vi)Outstanding Redeemable Preference Shares (vili) Capital Redemplion Reserve (ix)Debt Equ…",
+     "cosine": 0.7112,
+     "vec_rank": 24,
+     "bm25": 28.601,
+     "bm25_rank": 1,
+     "rrf": 0.05,
+     "cited": false
+    },
+    {
+     "doc": "data_4.pdf",
+     "page": 11,
+     "doc_label": "Consolidated Results — March 31, 2026",
+     "chunk_type": "table",
+     "snippet": "Consolidated Results — March 31, 2026\nCONSOLIDATEDFINANCIALRESULTSFORTHEQUARTERANDYEARENDEDMARCH31,2026\nReservesexcludingrevaluationreserves 579975.02 517218.98 19 Analytical Ratios and other disclosures : (i) Percentage of shares held by Government of India Nil N1I IIN Nil (il) Earnings per share(EPS)()(Face value of 1/-each): (Refer note 7) (a)Basic EPSbefore&afterextraordinary items 13.22 12.88 12.31 49.50 46.41 (net of tax expense) : not annualized (b)Diluted EPS before&afterextraordinary items 13.18 12.82 12.26 49.28 46.20 (netof taxexpense)-notannualized f Co. 2 MUMBAI 14Foo4, Ceaeiam Gt…",
+     "cosine": 0.7194,
+     "vec_rank": 16,
+     "bm25": 6.524,
+     "bm25_rank": 24,
+     "rrf": 0.04901,
+     "cited": false
+    },
+    {
+     "doc": "data_4.pdf",
+     "page": 1,
+     "doc_label": "Standalone Results — March 31, 2026",
+     "chunk_type": "row",
+     "snippet": "Standalone Results — March 31, 2026\nAnalytical Ratios and other dlsclosures: (i)Percentage of shares held by Government of India | Quarter ended March 31, 2026: Nil | Quarter ended December 31, 2025: Nit | Quarter ended March 31, 2025: IIN | Year ended March 31, 2026: IIN | Year ended March 31, 2025: Nil",
+     "cosine": 0.6644,
+     "vec_rank": 96,
+     "bm25": 4.87,
+     "bm25_rank": 36,
+     "rrf": 0.04759,
+     "cited": false
+    },
+    {
+     "doc": "data_4.pdf",
+     "page": 15,
+     "doc_label": "Consolidated Results — March 31, 2026",
+     "chunk_type": "table",
+     "snippet": "Consolidated Results — March 31, 2026\n9 During the year ended March 31, 2026, the Bank has made a floating provision of ? 9,000.00 crore in line with the Board approved\nratio under the Basel lll Framework. These disclosures would be available on the Bank's website at the following link: https://www.hdfc.bank.in/about-us/regulatory-disclosures. The disclosures have not been auditedbythestatutoryauditors. o s m classification. 1810million=1crore 14t Froy Calay) MUMBAI MUMBAI la. G3 Sashidhar Jagdishan Place: Mumbai Managing Director Date:April 18,2026 DIN-08614396",
+     "cosine": 0.7033,
+     "vec_rank": 37,
+     "bm25": 5.441,
+     "bm25_rank": 32,
+     "rrf": 0.04442,
+     "cited": false
+    },
+    {
+     "doc": "data_4.pdf",
+     "page": 12,
+     "doc_label": "Consolidated Results — March 31, 2026",
+     "chunk_type": "row",
+     "snippet": "Consolidated Results — March 31, 2026\nHDFC BANK Weunderstandyourworld Consolidated Segment information in accordance with the RBl guidelines and Accounting Standard 17 - Segment Reporting of the operating segmentsofthe Groupisasunder: (incrore) Particulars Quarter ended Year ended | Quarter ended March 31, 2026: 31.03.2026 | Quarter ended December 31, 2025: 31.12.2025 | Quarter ended March 31, 2025: 31,03.2025 | Year ended March 31, 2026: 31.03.2026 | Year ended March 31, 2025: 31.03.2025",
+     "cosine": 0.681,
+     "vec_rank": 80,
+     "bm25": 2.508,
+     "bm25_rank": 123,
+     "rrf": 0.04334,
+     "cited": false
+    }
+   ],
+   "top_similarity": 0.822,
+   "min_similarity": 0.3
+  },
+  "multihop": {
+   "answer": "The Gross NPA ratio fell from 1.24% on September 30, 2025 to 1.15% on March 31, 2026, a decline of 0.09 percentage points.",
+   "sources": [
+    {
+     "doc": "data_2.pdf",
+     "page": 1,
+     "snippet": "Standalone Results — September 30, 2025\nUNAUDITED STANDALONE FINANCIAL RESULTS FOR THE QUARTER AND HALF YEAR ENDED SEPTEMBER 30, 2025 Quarter ended Half year ended Year ended Particulars 30.09.2025 30.06.2025 30.09.2024 30.09.2025 30.09.2024 31.03.2025\n(c) % of Gross NPAs to Gross Advances 1.24% 1.40% 1.36% 1.24% 1.36% 1.33%",
+     "similarity": 0.694,
+     "doc_label": "Standalone Results — September 30, 2025",
+     "statement_type": "standalone",
+     "fiscal_period": "September 30, 2025"
+    },
+    {
+     "doc": "data_4.pdf",
+     "page": 1,
+     "snippet": "Standalone Results — March 31, 2026\n(c)% of Gross NPAs to Gross Advances | Quarter ended March 31, 2026: 1.15% | Quarter ended December 31, 2025: 1.24% | Quarter ended March 31, 2025: 1.33% | Year ended March 31, 2026: 1.15% | Year ended March 31, 2025: 1.33%",
+     "similarity": 0.694,
+     "doc_label": "Standalone Results — March 31, 2026",
+     "statement_type": "standalone",
+     "fiscal_period": "March 31, 2026"
+    }
+   ],
+   "refused": false,
+   "retrieval": [
+    {
+     "doc": "data_2.pdf",
+     "page": 1,
+     "doc_label": "Standalone Results — September 30, 2025",
+     "chunk_type": "row",
+     "snippet": "Standalone Results — September 30, 2025\nUNAUDITED STANDALONE FINANCIAL RESULTS FOR THE QUARTER AND HALF YEAR ENDED SEPTEMBER 30, 2025 Quarter ended Half year ended Year ended Particulars 30.09.2025 30.06.2025 30.09.2024 30.09.2025 30.09.2024 31.03.2025\nexpense) not annualized (iv) NPA Ratios: (a) Gross NPAS 34289.48 37040,80 34250.62 34289.48 34250.62 35222.64",
+     "cosine": 0.7272,
+     "vec_rank": 1,
+     "bm25": 8.827,
+     "bm25_rank": 4,
+     "rrf": 0.0528,
+     "cited": false
+    },
+    {
+     "doc": "data_4.pdf",
+     "page": 1,
+     "doc_label": "Standalone Results — March 31, 2026",
+     "chunk_type": "row",
+     "snippet": "Standalone Results — March 31, 2026\nexpense)-not annualized (iv) NPA Ratios: (a) Gross NPAs | Quarter ended March 31, 2026: 34061.19 | Quarter ended December 31, 2025: 35178.98 | Quarter ended March 31, 2025: 35222.64 | Year ended March 31, 2026: 34061.19 | Year ended March 31, 2025: 35222.64",
+     "cosine": 0.7187,
+     "vec_rank": 3,
+     "bm25": 9.857,
+     "bm25_rank": 3,
+     "rrf": 0.05279,
+     "cited": false
+    },
+    {
+     "doc": "data_2.pdf",
+     "page": 12,
+     "doc_label": "Consolidated Results — September 30, 2025",
+     "chunk_type": "table",
+     "snippet": "Consolidated Results — September 30, 2025\n8 During the quarter and half year ended September 30, 2025, the Bank has allotted 1,87,45,147 and 3,44,37,119 equity shares respectively, pursuant to 9 During the quarter ended September 30, 2025, the Bank has acquired 71,678 equity shares in HDFC Capital Advisors Limited (\"HCAL\") for consideration\nHDFC BANK\n\n          We understand your world\n\n          8 During the quarter and half year ended September 30, 2025, the Bank has allotted 1,87,45,147 and 3,44,37,119 equity shares respectively, pursuant to\n           the exercise of options / units under …",
+     "cosine": 0.7243,
+     "vec_rank": 2,
+     "bm25": 5.67,
+     "bm25_rank": 15,
+     "rrf": 0.05159,
+     "cited": false
+    },
+    {
+     "doc": "data_2.pdf",
+     "page": 13,
+     "doc_label": "Consolidated Results — September 30, 2025",
+     "chunk_type": "table",
+     "snippet": "Consolidated Results — September 30, 2025\nBank Limited for the quarter ended 30 September 2025 and year to date results for the period from\nBSR& Co. LLP Batliboi & Purohit Chartered Accountants Chartered Accountants 14th Floor, Central B Wing & North C Wing National Insurance Building, Nesco IT Park 4, Nesco Center 2nd Floor, 204, DN Road, Western Express Highway, Goregaon (East) Fort, Mumbai 400001 Mumbai -400063, India Independent Auditors' limited review report unaudited consolidated financial results of HDFC on Bank Limited for the quarter ended 30 September 2025 and year to date results f…",
+     "cosine": 0.7176,
+     "vec_rank": 8,
+     "bm25": 5.911,
+     "bm25_rank": 12,
+     "rrf": 0.05126,
+     "cited": false
+    },
+    {
+     "doc": "data_4.pdf",
+     "page": 1,
+     "doc_label": "Standalone Results — March 31, 2026",
+     "chunk_type": "row",
+     "snippet": "Standalone Results — March 31, 2026\n(c)% of Gross NPAs to Gross Advances | Quarter ended March 31, 2026: 1.15% | Quarter ended December 31, 2025: 1.24% | Quarter ended March 31, 2025: 1.33% | Year ended March 31, 2026: 1.15% | Year ended March 31, 2025: 1.33%",
+     "cosine": 0.694,
+     "vec_rank": 30,
+     "bm25": 6.187,
+     "bm25_rank": 9,
+     "rrf": 0.05125,
+     "cited": true
+    },
+    {
+     "doc": "data_2.pdf",
+     "page": 1,
+     "doc_label": "Standalone Results — September 30, 2025",
+     "chunk_type": "row",
+     "snippet": "Standalone Results — September 30, 2025\nUNAUDITED STANDALONE FINANCIAL RESULTS FOR THE QUARTER AND HALF YEAR ENDED SEPTEMBER 30, 2025 Quarter ended Half year ended Year ended Particulars 30.09.2025 30.06.2025 30.09.2024 30.09.2025 30.09.2024 31.03.2025\n(c) % of Gross NPAs to Gross Advances 1.24% 1.40% 1.36% 1.24% 1.36% 1.33%",
+     "cosine": 0.694,
+     "vec_rank": 32,
+     "bm25": 5.732,
+     "bm25_rank": 14,
+     "rrf": 0.0503,
+     "cited": true
+    },
+    {
+     "doc": "data_4.pdf",
+     "page": 15,
+     "doc_label": "Consolidated Results — March 31, 2026",
+     "chunk_type": "table",
+     "snippet": "Consolidated Results — March 31, 2026\n9 During the year ended March 31, 2026, the Bank has made a floating provision of ? 9,000.00 crore in line with the Board approved\nratio under the Basel lll Framework. These disclosures would be available on the Bank's website at the following link: https://www.hdfc.bank.in/about-us/regulatory-disclosures. The disclosures have not been auditedbythestatutoryauditors. o s m classification. 1810million=1crore 14t Froy Calay) MUMBAI MUMBAI la. G3 Sashidhar Jagdishan Place: Mumbai Managing Director Date:April 18,2026 DIN-08614396",
+     "cosine": 0.7129,
+     "vec_rank": 12,
+     "bm25": 5.441,
+     "bm25_rank": 19,
+     "rrf": 0.04921,
+     "cited": false
+    },
+    {
+     "doc": "data_4.pdf",
+     "page": 1,
+     "doc_label": "Standalone Results — March 31, 2026",
+     "chunk_type": "row",
+     "snippet": "Standalone Results — March 31, 2026\n(vi)Outstanding Redeemable Preference Shares (vili) Capital Redemplion Reserve (ix)Debt Equity Ratio* | Quarter ended March 31, 2026: 0.53 | Quarter ended December 31, 2025: 0.49 | Quarter ended March 31, 2025: 0.74 | Year ended March 31, 2026: 0.53 | Year ended March 31, 2025: 0.74",
+     "cosine": 0.6774,
+     "vec_rank": 65,
+     "bm25": 3.962,
+     "bm25_rank": 31,
+     "rrf": 0.04858,
+     "cited": false
+    }
+   ],
+   "top_similarity": 0.727,
+   "min_similarity": 0.3
+  },
+  "trap": {
+   "answer": "I couldn't find this in the provided documents, so I can't answer it.",
+   "sources": [],
+   "refused": true,
+   "retrieval": [
+    {
+     "doc": "data_4.pdf",
+     "page": 12,
+     "doc_label": "Consolidated Results — March 31, 2026",
+     "chunk_type": "row",
+     "snippet": "Consolidated Results — March 31, 2026\nHDFC BANK Weunderstandyourworld Consolidated Segment information in accordance with the RBl guidelines and Accounting Standard 17 - Segment Reporting of the operating segmentsofthe Groupisasunder: (incrore) Particulars Quarter ended Year ended | Quarter ended March 31, 2026: 31.03.2026 | Quarter ended December 31, 2025: 31.12.2025 | Quarter ended March 31, 2025: 31,03.2025 | Year ended March 31, 2026: 31.03.2026 | Year ended March 31, 2025: 31.03.2025",
+     "cosine": 0.6534,
+     "vec_rank": 48,
+     "bm25": 2.508,
+     "bm25_rank": 32,
+     "rrf": 0.05116,
+     "cited": false
+    },
+    {
+     "doc": "data_4.pdf",
+     "page": 11,
+     "doc_label": "Consolidated Results — March 31, 2026",
+     "chunk_type": "table",
+     "snippet": "Consolidated Results — March 31, 2026\nHDFC BANK We understandyourworld HDFC BANK LIMITED CIN:L65920MH1994PLC080618 Sandoz House,Shivsagar Estate,Dr.Annie Besant Road,Worli,Mumbai 400018. Website:https://www.hdfc.bank.in,Tel.:022-66521000,Fax:022-2496 0739 CONSOLIDATEDFINANCIALRESULTSFORTHEQUARTERANDYEARENDEDMARCH31,2026 incrore) Particulars Quarter ended Year ended 31.03.2026 31.12.2025 31.03.2025 31.03.2026 31.03.2025 Audited Unaudited Audited Audited Audited (Refer note 6)) (Refer note 6) Interest earned (a)+(b)+(c)+(d) 87182.50 87066.94 86779.34 348615.15 336367.43 a)Interest/discountonadva…",
+     "cosine": 0.681,
+     "vec_rank": 13,
+     "bm25": 3.342,
+     "bm25_rank": 11,
+     "rrf": 0.04837,
+     "cited": false
+    },
+    {
+     "doc": "data_4.pdf",
+     "page": 15,
+     "doc_label": "Consolidated Results — March 31, 2026",
+     "chunk_type": "table",
+     "snippet": "Consolidated Results — March 31, 2026\n9 During the year ended March 31, 2026, the Bank has made a floating provision of ? 9,000.00 crore in line with the Board approved\nratio under the Basel lll Framework. These disclosures would be available on the Bank's website at the following link: https://www.hdfc.bank.in/about-us/regulatory-disclosures. The disclosures have not been auditedbythestatutoryauditors. o s m classification. 1810million=1crore 14t Froy Calay) MUMBAI MUMBAI la. G3 Sashidhar Jagdishan Place: Mumbai Managing Director Date:April 18,2026 DIN-08614396",
+     "cosine": 0.6993,
+     "vec_rank": 3,
+     "bm25": 2.281,
+     "bm25_rank": 41,
+     "rrf": 0.04633,
+     "cited": false
+    },
+    {
+     "doc": "data_4.pdf",
+     "page": 11,
+     "doc_label": "Consolidated Results — March 31, 2026",
+     "chunk_type": "table",
+     "snippet": "Consolidated Results — March 31, 2026\nCONSOLIDATEDFINANCIALRESULTSFORTHEQUARTERANDYEARENDEDMARCH31,2026\nReservesexcludingrevaluationreserves 579975.02 517218.98 19 Analytical Ratios and other disclosures : (i) Percentage of shares held by Government of India Nil N1I IIN Nil (il) Earnings per share(EPS)()(Face value of 1/-each): (Refer note 7) (a)Basic EPSbefore&afterextraordinary items 13.22 12.88 12.31 49.50 46.41 (net of tax expense) : not annualized (b)Diluted EPS before&afterextraordinary items 13.18 12.82 12.26 49.28 46.20 (netof taxexpense)-notannualized f Co. 2 MUMBAI 14Foo4, Ceaeiam Gt…",
+     "cosine": 0.677,
+     "vec_rank": 16,
+     "bm25": 3.091,
+     "bm25_rank": 20,
+     "rrf": 0.04617,
+     "cited": false
+    },
+    {
+     "doc": "data_4.pdf",
+     "page": 14,
+     "doc_label": "Consolidated Results — March 31, 2026",
+     "chunk_type": "table",
+     "snippet": "Consolidated Results — March 31, 2026\nHDFC BANK We understand your world (Rin crore) Particulars Yearended Yearended 31.03.2026 31.03.2025 Audited Audited Cashflowsfromfinancingactivities: Increaseinminorityinterest(includingissueof ESo Psbysubsidiaries) 2331.21 2382.88 Proceedsfromissueofsharecapital 5108.50 6346.50 Proceeds from issue of shares through subsidiary IPO (net of issue expenses) 2456.61 Proceedsfromissueof Tier1and Tier2capitalinstruments 700.00 1182.00 Repaymentsof Tier 1and Tier2capitalinstruments (500.00) Repaymentsfromotherborrowings(net) (48895.19) (97062.73) Dividendpaid du…",
+     "cosine": 0.7016,
+     "vec_rank": 2,
+     "bm25": 1.949,
+     "bm25_rank": 47,
+     "rrf": 0.04601,
+     "cited": false
+    },
+    {
+     "doc": "data_4.pdf",
+     "page": 2,
+     "doc_label": "Standalone Results — March 31, 2026",
+     "chunk_type": "row",
+     "snippet": "Standalone Results — March 31, 2026\nHDFC BANK Weunderstandyourworid Standalone Segment information in accordance with the RBl guidelines and Accounting Standard 17 -Segment Reporting of the operating segments of the Bank is as under: (incrore) Quarterended Yearended Partlculars | Quarter ended March 31, 2026: 31.03.2026 | Quarter ended December 31, 2025: 31.12.2025 | Quarter ended March 31, 2025: 31.03.2025 | Year ended March 31, 2026: 31.03.2026 | Year ended March 31, 2025: 31,03.2025",
+     "cosine": 0.6294,
+     "vec_rank": 117,
+     "bm25": 2.465,
+     "bm25_rank": 35,
+     "rrf": 0.04574,
+     "cited": false
+    },
+    {
+     "doc": "data_4.pdf",
+     "page": 1,
+     "doc_label": "Standalone Results — March 31, 2026",
+     "chunk_type": "table",
+     "snippet": "Standalone Results — March 31, 2026\nHDFC BANK We understand your world HDFCBANKLIMITED CIN:L65920MH1994PLC080618 Sandoz Houso,Shlvsagar Estato,Dr.Annlo Bosant Road,Worll, Mumbal 400 018. Wobslto:https://www.hdfc.bank.1n,Tol.:022-66621000,Fax:022-24960739 (incrore) Quarterended Yearended Particulars 31.03.2026 31.12.2026 31.03.2025 31.03.2026 31.03.2026 Audited Unaudited Audited Audited Audted (Refer note6) (Rafer note 6) Interestearned(a)+(b)+(c)+(d) 76610.02 76751.16 77460.11 307522.08 300517.04 a)Interest/discounton advances/bills 60351.21 59953.80 60415.79 239762.46 238444.43 b)Incomeoninve…",
+     "cosine": 0.685,
+     "vec_rank": 11,
+     "bm25": 2.668,
+     "bm25_rank": 30,
+     "rrf": 0.04573,
+     "cited": false
+    },
+    {
+     "doc": "data_4.pdf",
+     "page": 23,
+     "doc_label": "Consolidated Results — March 31, 2026",
+     "chunk_type": "prose",
+     "snippet": "Consolidated Results — March 31, 2026\nB S R & Co. LLP\nBatliboi & Purohit\nChartered Accountants\nChartered Accountants\nAnnexure I\nList of entities included in the consolidated annual financial results.\nParent entity\nHDFC Bank Limited\nSubsidiaries\nSr. No.\nName of the entity\nRelationship\n1\nHDFC Life Insurance Company Limited ('HDFC Life')\nSubsidiary\n2\nHDB Financial Services Limited ('HDB FSL')\nSubsidiary\n3\nHDFC Securities Limited (*HSL')\nSubsidiary\n4\nHDFC Asset Management Company Limited\nSubsidiary\n('HDFC AMC')\n5\nHDFC Ergo General Insurance Company Limited\nSubsidiary\n(“HDFC Ergo')\n6\nHDFC Sales Pri…",
+     "cosine": 0.6419,
+     "vec_rank": 77,
+     "bm25": 5.217,
+     "bm25_rank": 2,
+     "rrf": 0.04548,
+     "cited": false
+    }
+   ],
+   "top_similarity": 0.702,
+   "min_similarity": 0.3
+  }
+ }
+}

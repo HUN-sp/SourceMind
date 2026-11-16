@@ -36,7 +36,7 @@ def test_zero_size_disables_caching():
 def _setup(monkeypatch, refused=False):
     calls = []
 
-    def fake_ask(q, doc=None):
+    def fake_ask(q, doc=None, **_):
         calls.append((q, doc))
         src = [] if refused else [Source(doc="d.pdf", page=1, snippet="s", similarity=0.9, fiscal_period="March 31, 2026")]
         return AskResult(answer="nope" if refused else "1.15%", sources=src, refused=refused, retrieved=[], top_similarity=0.9)

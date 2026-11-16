@@ -21,6 +21,7 @@ fastapi==0.162.0
 uvicorn[standard]==0.54.0
 pydantic==2.14.3
 python-dotenv==1.2.4
+limits==3.13.0              # live-LLM quota (the engine slowapi is built on; see rag/quota.py)
 
 # --- LLM (Groq free tier, OpenAI-compatible) ---
 groq==1.7.0
