@@ -55,7 +55,7 @@ def test_ask_is_rate_limited_with_retry_after(tiny_index, monkeypatch):
     from rag import pipeline
 
     fake = lambda s, u: json.dumps({"not_covered": True, "answer": "", "used_passages": []})
-    monkeypatch.setattr(app_module, "ask", lambda q, doc=None: pipeline.ask(q, doc=doc, generate=fake))
+    monkeypatch.setattr(app_module, "ask", lambda q, doc=None, **_: pipeline.ask(q, doc=doc, generate=fake))
     monkeypatch.setattr(app_module, "limiter", SlidingWindowLimiter(limit=2, window_seconds=60))
     codes = [client.post("/ask", json={"question": "gross NPA"}).status_code for _ in range(3)]
     assert codes == [200, 200, 429]

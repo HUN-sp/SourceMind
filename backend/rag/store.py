@@ -66,6 +66,12 @@ class Retrieved:
     fiscal_period: str = ""
     chunk_type: str = ""
     chunk_index: int = -1
+    # Retrieval transparency (for the UI's "Retrieval & Evals" inspector). These never
+    # affect ranking; they report what each first-stage signal said about this chunk.
+    bm25: float | None = None      # raw BM25 score (None when hybrid is off)
+    vec_rank: int | None = None    # 1-based rank by cosine among the candidates
+    bm25_rank: int | None = None   # 1-based rank by BM25 among the candidates
+    rrf: float | None = None       # fused RRF score incl. period/recency bonus (None when hybrid is off)
 
 
 def index_chunks(chunks: list[Chunk], batch_size: int = 128) -> int:
@@ -416,11 +422,13 @@ def _rrf_fuse(
     top_k: int,
     bonus: dict[int, float] | None = None,
     weights: list[float] | None = None,
+    scores_out: dict[int, float] | None = None,
 ) -> list[int]:
     """Reciprocal Rank Fusion: score each candidate by sum(1/(rrf_k + rank)) over
     every ranking it appears in, then take the best top_k. A chunk that ranks
     well in EITHER the vector or the keyword list rises to the top. `bonus` adds a
-    small per-chunk score (e.g. a recency tiebreak)."""
+    small per-chunk score (e.g. a recency tiebreak). If `scores_out` is given it is
+    filled with every candidate's fused score (for display only)."""
     k = CONFIG.rrf_k
     scores: dict[int, float] = {int(i): 0.0 for i in candidate_idx}
     for n, ranking in enumerate(ranked_lists):
@@ -432,6 +440,8 @@ def _rrf_fuse(
             if idx in scores:
                 scores[idx] += b
     ordered = sorted(scores, key=lambda i: scores[i], reverse=True)
+    if scores_out is not None:
+        scores_out.update(scores)
     return ordered[:top_k]
 
 
@@ -480,11 +490,16 @@ def search(
 
     # Vector ranking over the candidates (best first).
     vec_order = candidate_idx[np.argsort(-sims[candidate_idx])]
+    vec_rank = {int(idx): r + 1 for r, idx in enumerate(vec_order)}
+    bm25_scores = None
+    bm25_rank: dict[int, int] = {}
+    fused: dict[int, float] = {}
 
     if hybrid:
         # Keyword ranking over the same candidates, then fuse the two by RRF.
         bm25_scores = _get_bm25().get_scores(_query_tokens(search_text))
         bm25_order = candidate_idx[np.argsort(-bm25_scores[candidate_idx])]
+        bm25_rank = {int(idx): r + 1 for r, idx in enumerate(bm25_order)}
         # Recency tiebreak: only when the question names no specific period.
         bonus = None
         if CONFIG.recency_boost > 0 and not _query_names_period(question):
@@ -503,7 +518,7 @@ def search(
                 if part.size:
                     lists.append(part)
                     weights.append(CONFIG.row_weight if want_rows else 1.0)
-        chosen = _rrf_fuse(lists, candidate_idx, pool_k, bonus, weights)
+        chosen = _rrf_fuse(lists, candidate_idx, pool_k, bonus, weights, scores_out=fused)
     else:
         chosen = vec_order[:pool_k].tolist()
 
@@ -528,6 +543,10 @@ def search(
                 fiscal_period=m.get("fiscal_period", ""),
                 chunk_type=m.get("chunk_type", ""),
                 chunk_index=int(m.get("chunk_index", -1)),
+                bm25=float(bm25_scores[int(idx)]) if bm25_scores is not None else None,
+                vec_rank=vec_rank.get(int(idx)),
+                bm25_rank=bm25_rank.get(int(idx)),
+                rrf=fused.get(int(idx)),
             )
         )
     return out

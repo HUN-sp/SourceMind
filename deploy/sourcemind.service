@@ -1,0 +1,28 @@
+[Unit]
+Description=SourceMind API (FastAPI / uvicorn)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=sourcemind
+Group=sourcemind
+WorkingDirectory=/opt/sourcemind/backend
+# Secrets (GROQ_API_KEY) live in /opt/sourcemind/.env (chmod 600), read by rag/config.py.
+Environment=HF_HOME=/opt/sourcemind/.cache/huggingface
+Environment=WARMUP=true
+Environment=OMP_NUM_THREADS=2
+Environment=TOKENIZERS_PARALLELISM=false
+# Pre-indexed corpus: build the index on first boot if it isn't there (OCR takes minutes).
+ExecStartPre=/bin/sh -c 'test -s /opt/sourcemind/storage/index/embeddings.npy || exec /opt/sourcemind/backend/.venv/bin/python ingest.py'
+ExecStart=/opt/sourcemind/backend/.venv/bin/uvicorn app:app --host 127.0.0.1 --port 8000 --workers 1 --proxy-headers --forwarded-allow-ips 127.0.0.1 --no-server-header
+Restart=always
+RestartSec=5
+TimeoutStartSec=1800
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=full
+ProtectHome=true
+
+[Install]
+WantedBy=multi-user.target

@@ -7,6 +7,10 @@ and **honestly refuse** when the answer isn't in the corpus.
 The provided corpus is four HDFC Bank quarterly/annual financial filings, but the
 pipeline is general — it never hardcodes anything about a specific file.
 
+**Live demo:** <https://15-207-158-180.sslip.io> — no sign-in, no uploads. Click one of the
+three sample chips (exact figure · multi-hop across filings · unanswerable trap), then open
+**Retrieval & Evals** to see the BM25 / BGE-small / RRF score of every retrieved chunk.
+
 ---
 
 ## Architecture at a glance
@@ -157,6 +161,28 @@ Error `detail` text is safe to show to users (raw provider errors are only logge
 
 Repeating a question is answered from an in-memory cache (`cached: true`, no LLM tokens
 spent); refusals are never cached.
+
+## Public demo mode
+
+| Feature | Where | What it does |
+|---|---|---|
+| Pre-loaded corpus | `deploy/sourcemind.service` | The index ships with the deploy; if it's missing, `ExecStartPre` runs `ingest.py` before the API starts. `WARMUP=true` loads the model at boot. |
+| One-click demo chips | `rag/demo.py`, `GET /demo` | Three presets: answerable figure, multi-hop across two filings, and an unanswerable crypto trap (calibrated refusal). |
+| Zero-token preset answers | `build_demo_cache.py` → `demo/demo_cache.json` | Real pipeline output recorded once and served in a few ms. Tied to the index's sha256, so a re-built index falls back to live answers instead of serving stale citations. |
+| Retrieval & Evals inspector | `frontend/src/components/Inspector.jsx` | `/ask` now returns `retrieval[]` (cosine, BM25, ranks, fused RRF, `cited`), `top_similarity` and `latency_ms`; the evals tab reads `demo/evals.json`. |
+| Quota protection | `rag/quota.py` | `LLM_LIMIT_PER_IP=15/hour` and `LLM_LIMIT_GLOBAL=800/day` count only requests that actually reach the LLM (presets, cache hits and gate-1 refusals are free). Built on `limits`, the engine behind slowapi. |
+
+Re-run `python build_demo_cache.py` (3 LLM calls) whenever you re-ingest.
+
+### Deploy (single EC2 instance + Caddy HTTPS)
+`deploy/` holds everything: `provision.sh` (2 GB swap, CPU-only torch, venv, systemd, Caddy),
+`sourcemind.service` (uvicorn behind `--proxy-headers`, `Restart=always`), `Caddyfile`
+(automatic Let's Encrypt for `<ip-with-dashes>.sslip.io`, serves `frontend/dist`, proxies
+`/api/*`), and `e2e_check.py` (HTTP + headless-browser smoke test that spends zero tokens).
+
+```bash
+python deploy/e2e_check.py https://15-207-158-180.sslip.io
+```
 
 ## Repo layout
 ```

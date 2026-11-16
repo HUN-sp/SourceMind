@@ -33,6 +33,21 @@ function CopyButton({ result }) {
   );
 }
 
+// Where the response came from and what it cost — part of making the system legible.
+export function ResponseMeta({ result }) {
+  if (result.latency_ms === undefined || result.latency_ms === null) return null;
+  const gate1 = result.refused && (result.top_similarity ?? 1) < (result.min_similarity ?? 0);
+  let how;
+  if (result.cached) how = result.preset ? "pre-computed demo response · 0 LLM tokens" : "answer cache · 0 LLM tokens";
+  else if (gate1) how = "refused at the similarity gate · 0 LLM tokens";
+  else how = "live retrieval + LLM";
+  return (
+    <p className="response-meta" data-testid="response-meta">
+      {result.latency_ms} ms · {how}
+    </p>
+  );
+}
+
 // Renders the result of an /ask call. Two visual modes:
 //   - refused: the system honestly didn't find the answer in the documents.
 //   - answered: show the grounded answer + the sources that support it.
@@ -46,6 +61,7 @@ export default function AnswerPanel({ result }) {
           The system only answers from the provided documents. It declined rather
           than guess.
         </p>
+        <ResponseMeta result={result} />
       </section>
     );
   }
@@ -72,6 +88,7 @@ export default function AnswerPanel({ result }) {
           <SourceCard key={`${s.doc}-${s.page}-${i}`} source={s} index={i} />
         ))}
       </ul>
+      <ResponseMeta result={result} />
     </section>
   );
 }

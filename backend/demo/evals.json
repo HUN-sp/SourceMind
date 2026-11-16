@@ -1,0 +1,35 @@
+{
+  "headline": "Grounded answers with page-level citations, and calibrated refusals when the corpus doesn't contain the answer.",
+  "pipeline": [
+    "BGE-small (bge-small-en-v1.5) cosine ranking + BM25 keyword ranking",
+    "Fused by Reciprocal Rank Fusion (k=60); table rows and page chunks ranked in separate lists; small period/recency bonus",
+    "Gate 1: refuse without an LLM call if the best cosine < 0.30",
+    "Gate 2: the LLM answers only from numbered passages in strict JSON, or flags not_covered → refusal"
+  ],
+  "eval10": {
+    "title": "10-question hand-graded evaluation (EVALUATION.md)",
+    "note": "Original system, Groq llama-3.3-70b. Mix of direct lookups, paraphrases, multi-period comparisons and unanswerable traps.",
+    "rows": [
+      {"label": "Correct, grounded + cited", "value": 6},
+      {"label": "Correct refusal (not in corpus)", "value": 2},
+      {"label": "Wrong answer (value row mis-retrieved)", "value": 1},
+      {"label": "False refusal", "value": 1}
+    ],
+    "takeaway": "Both failures had one root cause — terse numeric table rows ranked below fluent prose — never a fabricated figure. Fixed by row-level, column-labelled chunks: a later live run (openai/gpt-oss-120b) got 14 of 15 correct with 0 false refusals."
+  },
+  "ablation": {
+    "title": "A/B: cross-encoder reranker (ms-marco-MiniLM-L-6-v2)",
+    "note": "Token-free harness (retrieval_harness.py): is the answer chunk in the top-8? Re-run on this index, 17 answerable questions.",
+    "rows": [
+      {"label": "Hybrid BM25 + BGE + RRF (default)", "value": "15/17"},
+      {"label": "+ cross-encoder reranker", "value": "15/17"}
+    ],
+    "rank_shifts": [
+      {"q": "Net profit, FY2026 (standalone)", "off": 2, "on": 4},
+      {"q": "Net profit trend Q2–Q4 (Q4 figure)", "off": 1, "on": 5},
+      {"q": "Consolidated net profit, FY2026", "off": 2, "on": 4},
+      {"q": "Gross NPA ratio change Sep→Mar", "off": 5, "on": 1}
+    ],
+    "takeaway": "No recall gain. The reranker favours text that 'reads like an answer', so it pushes terse numeric value rows (the profit figures) down while helping some prose questions. In an earlier version it ranked an OFS 'net gain on sale of shares ₹9,179 cr' note above the real 'Net Profit for the period' row and the LLM answered with the wrong figure. Since exact figures are what users cite, it ships disabled (USE_RERANKER=false) — and it saves an 80 MB model and latency on this 1 GB server."
+  }
+}

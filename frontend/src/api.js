@@ -93,6 +93,21 @@ export async function listDocuments() {
 }
 
 /**
+ * Demo presets + evaluation summary from /demo: `{presets[], evals, limits}`, or
+ * `null` on any failure (the UI then falls back to plain example chips).
+ */
+export async function getDemo() {
+  try {
+    const res = await fetch("/api/demo");
+    if (!res.ok) return null;
+    const body = await res.json();
+    return Array.isArray(body?.presets) ? body : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
  * Backend readiness from /health: `{ready, problems[], ...}`, or `null` if the
  * backend can't be reached (network error, or the dev proxy's bare 5xx).
  */

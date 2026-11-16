@@ -74,7 +74,7 @@ def test_api_key_is_never_echoed(monkeypatch):
     (LLMError("LLM call failed."), 502),
 ])
 def test_endpoint_maps_llm_errors_to_status_codes(monkeypatch, tiny_index, exc, status):
-    def boom(q, doc=None):
+    def boom(q, doc=None, **_):
         raise exc
 
     monkeypatch.setattr(app_module, "ask", boom)
